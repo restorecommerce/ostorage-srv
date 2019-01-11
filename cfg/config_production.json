@@ -1,0 +1,47 @@
+{
+  "logger": {
+    "elasticsearch": {
+      "level": "error",
+      "clientOpts": {
+        "host": "elasticsearch:9200"
+      },
+      "source": "ostorage-srv"
+    }
+  },
+  "redis": {
+    "host": "redis"
+  },
+  "s3": {
+    "client": {
+      "accessKeyId": "accessKey",
+      "secretAccessKey": "secretkey",
+      "aws_host": "test",
+      "aws_endpoint": "127.0.0.1:80"
+    }
+  },
+  "events": {
+    "kafka": {
+      "kafkaHost": "kafka:9092"
+    }
+  },
+  "server": {
+    "transports": [
+      {
+        "name": "grpcOstorage",
+        "provider": "grpc",
+        "services": {
+          "io-restorecommerce-ordering-srv": "io.restorecommerce.ostorage.Service",
+          "io-restorecommerce-ordering-reflection": "grpc.reflection.v1alpha.ServerReflection",
+          "io-restorecommerce-ordering-cis": "io.restorecommerce.commandinterface.Service"
+        },
+        "protos": [
+          "io/restorecommerce/ostorage.proto",
+          "grpc/reflection/v1alpha/reflection.proto",
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "addr": "ostorage-srv:50051"
+      }
+    ]
+  }
+}
