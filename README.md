@@ -46,11 +46,13 @@ This microservice exposes the following gRPC endpoints:
 | key | string | required | Object key. |
 
 `io.restorecommerce.ostorage.List`
+
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | bucket | string | optional | If bucket name provied it will return its files otherwise it will return all files. |
 
 `io.restorecommerce.ostorage.FilesInformation`
+
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | bucket | string | required | bucket name. |
