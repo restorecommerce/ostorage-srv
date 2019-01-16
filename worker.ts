@@ -33,7 +33,7 @@ export class Worker {
     await events.start();
     this.offsetStore = new chassis.OffsetStore(events, cfg, logger);
 
-    const oss = new OStorageService(cfg.get('s3'), logger);
+    const oss = new OStorageService(cfg.get(), logger);
     const cis = new OStorageCommandInterface(server, cfg.get(), logger, events);
 
     const eventListener = async function eventListener(msg: any,

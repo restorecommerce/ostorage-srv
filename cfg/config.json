@@ -5,7 +5,7 @@
       "secretAccessKey": "secretKey",
       "endpoint": "http://127.0.0.1:9000",
       "s3ForcePathStyle": true
-    }, 
+    },
     "buckets": [
       "invoices",
       "documents",
@@ -19,10 +19,6 @@
     "db-indexes": {
       "db-offsetStore": 0
     }
-  },
-  "url":
-  {
-    "host":"http//localhost:5000/"
   },
   "events": {
     "kafka": {
@@ -139,7 +135,7 @@
             "grpcOstorage"
           ]
         },
-        "list":{
+        "list": {
           "transport": [
             "grpcOstorage"
           ]
