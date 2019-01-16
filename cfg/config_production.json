@@ -33,9 +33,9 @@
         "name": "grpcOstorage",
         "provider": "grpc",
         "services": {
-          "io-restorecommerce-ordering-srv": "io.restorecommerce.ostorage.Service",
-          "io-restorecommerce-ordering-reflection": "grpc.reflection.v1alpha.ServerReflection",
-          "io-restorecommerce-ordering-cis": "io.restorecommerce.commandinterface.Service"
+          "io-restorecommerce-ostorage-srv": "io.restorecommerce.ostorage.Service",
+          "io-restorecommerce-ostorage-reflection": "grpc.reflection.v1alpha.ServerReflection",
+          "io-restorecommerce-ostorage-cis": "io.restorecommerce.commandinterface.Service"
         },
         "protos": [
           "io/restorecommerce/ostorage.proto",
