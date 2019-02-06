@@ -1,0 +1,223 @@
+{
+  "host": {
+    "endpoint": "http://localhost:5000/"
+  },
+  "s3": {
+    "client": {
+      "accessKeyId": "accessKey",
+      "secretAccessKey": "secretKey",
+      "endpoint": "http://127.0.0.1:9000",
+      "s3ForcePathStyle": true
+    },
+    "buckets": [
+      "invoices",
+      "documents",
+      "usercontent"
+     ]
+  },
+  "logger": {
+    "console": {
+      "handleExceptions": false,
+      "level": "error",
+      "colorize": true,
+      "prettyPrint": true
+    }
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "offsetStoreInterval": 1000,
+    "db-indexes": {
+      "db-offsetStore": 0
+    }
+  },
+  "grpc-client": {
+     "service-ostorage": {
+        "transports": {
+          "grpc": {
+          "service": "io.restorecommerce.ostorage.Service",
+          "protos": [
+            "io/restorecommerce/ostorage.proto"
+          ],
+          "protoRoot": "node_modules/@restorecommerce/protos/",
+          "timeout": 3000
+        }
+        },
+        "loadbalancer": {
+          "name": "roundRobin"
+        },
+        "publisher": {
+          "name": "static",
+          "instances": [
+            "grpc://localhost:50066"
+          ]
+        },
+        "endpoints": {
+          "put": {},
+          "get": {},
+          "delete": {},
+          "list": {}
+        }
+      }
+  },
+  "events": {
+    "kafka": {
+      "provider": "kafka",
+      "groupId": "restore-ostorage-srv",
+      "clientId": "restore-ostorage-srv",
+      "kafkaHost": "localhost:9092",
+      "latestOffset": false,
+      "restoreCommand": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
+      },
+      "restoreResponse": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
+      "healthCheckCommand": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
+      },
+      "healthCheckResponse": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
+      "versionCommand": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
+      },
+      "versionResponse": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
+      "resetCommand": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
+      },
+      "resetResponse": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
+      "renderRequest": {
+        "protos": [
+          "io/restorecommerce/rendering.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.rendering.RenderRequest"
+      },
+      "renderResponse": {
+        "protos": [
+          "io/restorecommerce/rendering.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.rendering.RenderResponse"
+      },
+      "topics": {
+        "command": {
+          "topic": "io.restorecommerce.command",
+          "events": [
+            "healthCheckCommand",
+            "restoreCommand",
+            "resetCommand",
+            "versionCommand"
+          ]
+        }
+      }
+    }
+  },
+  "urns": {
+    "roleScopingEntity": "urn:restorecommerce:acs:names:model:entity",
+    "roleScopingInstance": "urn:oasis:names:tc:xacml:1.0:resource:resource-id",
+    "organizationUrn": "urn:restorecommerce:acs:model:organization.Organization",
+    "ownerIndicatoryEntity": "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
+    "ownerIndicatoryInstance": "urn:restorecommerce:acs:names:ownerInstance"
+  },
+  "server": {
+    "services": {
+      "io-restorecommerce-ostorage-srv": {
+        "put": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        },
+        "get": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        },
+        "delete": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        },
+        "list": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        }
+      },
+      "io-restorecommerce-ostorage-reflection": {
+        "serverReflectionInfo": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        }
+      },
+      "io-restorecommerce-ostorage-cis": {
+        "command": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        }
+      }
+    },
+    "transports": [
+      {
+        "name": "grpcOstorage",
+        "provider": "grpc",
+        "services": {
+          "io-restorecommerce-ostorage-srv": "io.restorecommerce.ostorage.Service",
+          "io-restorecommerce-ostorage-reflection": "grpc.reflection.v1alpha.ServerReflection",
+          "io-restorecommerce-ostorage-cis": "io.restorecommerce.commandinterface.Service"
+        },
+        "protos": [
+          "io/restorecommerce/ostorage.proto",
+          "grpc/reflection/v1alpha/reflection.proto",
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "addr": "localhost:50066"
+      }
+    ]
+  },
+  "serviceNames": {
+    "ostorage": "io-restorecommerce-ostorage-srv",
+    "reflection": "io-restorecommerce-ostorage-reflection",
+    "cis": "io-restorecommerce-ostorage-cis"
+  }
+}

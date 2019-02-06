@@ -25,6 +25,7 @@
     "@restorecommerce/resource-base-interface": "github:restorecommerce/resource-base-interface",
     "@restorecommerce/service-config": "^0.1.0",
     "aws-sdk": "^2.326.0",
+    "cross-env": "^5.2.0",
     "koa-multer": "^1.0.2",
     "memorystream": "^0.3.1",
     "multer-s3": "^2.9.0",
@@ -43,14 +44,12 @@
   },
   "scripts": {
     "start": "node start.js",
-    "dev": "export NODE_ENV=development; nodemon start.js",
-    "pretest": "npm run tsctests && npm run createtopics",
-    "test": "npm run lint && npm run mocha",
-    "lint": "tslint './client/*.ts' './service.ts' './start.ts'",
-    "mocha": "export NODE_ENV=test; mocha -R spec ./test/*.js --full-trace --exit",
-    "tsctests": "tsc test/*.ts --module commonjs -target ES6",
-    "test-debug": "mocha -R spec ./test/*.js --inspect-brk",
-    "coveralls": "export NODE_ENV=test; istanbul cover ./node_modules/mocha/bin/_mocha --report lcovonly -- -R spec ./test/*.js --exit",
+    "dev": "cross-env NODE_ENV=development nodemon start.js",
+    "pretest": "npm run tsctests",
+    "test": "npm run mocha",
+    "mocha": "cross-env NODE_ENV=test mocha --timeout 15000 -R spec test/test.js --full-trace --exit",
+    "tsctests": "tsc test/test.ts --module commonjs -target ES6",
+    "test-debug": "cross-env NODE_ENV=test mocha -R spec test/test.js --inspect-brk",
     "postinstall": "tsc -d"
   },
   "engines": {
