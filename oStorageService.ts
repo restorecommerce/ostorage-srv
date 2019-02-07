@@ -157,18 +157,24 @@ export class OStorageService {
     }, (error, data) => { });
     readable.pipe(passStream);
 
-    const result = await new Promise<void>((resolve, reject) => {
+    const output = await new Promise<any>((resolve, reject) => {
       uploadable
         .on('httpUploadProgress', (chunk) => {
           if (chunk.loaded == chunk.total) {
             this.logger.info(`Successfully persisted object ${key}
                           in bucket ${bucket}`);
-            resolve();
+            resolve(true);
           }
+          else reject();
         })
         .send();
     });
-    return this.host + bucket + '/' + uid;
+    if (output) {
+      const url = this.host + bucket + '/' + uid;
+      const result = { url, bucket, key: uid };
+      console.log('result is .............', result);
+      return result;
+    }
   }
 
   async delete(call: Call<DeleteRequest>, context?: any): Promise<void> {
@@ -189,8 +195,6 @@ export class OStorageService {
       });
       throw result.$response.error;
     }
-
-
     this.logger.info(`Successfully deleted object ${key} from bucket ${bucket}`);
   }
 }
