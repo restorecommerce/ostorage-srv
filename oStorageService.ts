@@ -83,25 +83,33 @@ export class OStorageService {
       throw new InvalidBucketName(bucket);
     }
     const params = { Bucket: bucket, Key: key };
-    const metaS3Obj: any = await new Promise((resolve, reject) => {
-      this.ossClient.headObject(params, (err, data) => {
+    if (flag) {
+      const meta: any = await new Promise((resolve, reject) => {
+        this.ossClient.headObject(params, (err, data) => {
+          if (err) {
+            console.log(err, err.stack);
+            reject(err);
+          }
+          resolve(data.Metadata);
+        });
+      });
+      const metaObj = JSON.parse(meta.meta);
+      return {
+        meta: metaObj
+      };
+    }
+
+    this.logger.verbose(`Received a request to get object ${key} on bucket ${bucket}`);
+    const meta_key: any = await new Promise((resolve, reject) => {
+      this.ossClient.headObject({ Bucket: bucket, Key: key }, (err, data) => {
         if (err) {
           console.log(err, err.stack);
           reject(err);
         }
-        resolve(data.Metadata);
+        resolve(data);
       });
     });
-    if (flag && metaS3Obj) {
-      const metaStr = metaS3Obj.Metadata.meta;
-      const meta = JSON.stringify(metaStr);
-      return {
-        meta
-      };
-    }
-    this.logger.verbose(`Received a request to get object ${key} on
-    bucket ${bucket}`);
-    const fileName = metaS3Obj.filename;
+    const fileName = meta_key.Metadata.filename;
     const stream = new MemoryStream(null, { readable: false });
     const object = await new Promise<any>((resolve, reject) => {
       this.ossClient.getObject({
@@ -124,11 +132,9 @@ export class OStorageService {
         })
         .send((err, data) => { resolve(); });
     });
-    const metaStr = metaS3Obj.meta;
-    const meta = JSON.parse(metaStr);
-    const url = this.host + bucket + '/' + metaS3Obj.key;
+    const url = this.host + bucket + '/' + meta_key.Metadata.key;
     return {
-      bucket, key, object, fileName, url, meta
+      bucket, key, object, fileName, url
     };
   }
 
