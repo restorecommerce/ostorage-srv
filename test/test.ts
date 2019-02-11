@@ -73,27 +73,24 @@ describe('testing ostorage-srv', () => {
 
             let result = await oStorage.put({
                 bucket: 'invoices',
-                // todo  what's the point of key if you can add several items with the same key?
                 key: 'test_object_234',
                 object: "Test object.",
-                meta: meta,
-                fileName: 'test_file.txt',
-                url: 'file_url',
-                prefix: 'test'
+                meta: meta
             });
             should(result.error).null;
-            should.exist(result.data.url);
+            should.exist(result.data.bucket);
+            should.exist(result.data.key);
             
+            var itemKey = result.data.key;
+            var itemBucket = result.data.bucket;
             result = await oStorage.list({
-                bucket: 'invoices'
+                bucket: itemBucket
             });
-            // todo since delete and unique key are not working, array size will grow each time test runs
-            // should(result.data.file_information).length(1);
+            should(result.data.file_information).length(1);
 
             result = await oStorage.delete({
-                bucket: 'invoices',
-                // todo how can you delete object by key if it's ignored?
-                key: 'test_object_234'
+                bucket: itemBucket,
+                key: itemKey
             });
             should(result.error).null;
             should(result.data).empty;
