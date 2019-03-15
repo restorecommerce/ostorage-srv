@@ -1,7 +1,6 @@
 import * as _ from 'lodash';
 import * as aws from 'aws-sdk';
 import * as uuid from 'uuid';
-
 import * as MemoryStream from 'memorystream';
 import { PassThrough, Readable } from 'stream';
 
@@ -178,7 +177,6 @@ export class OStorageService {
     if (output) {
       const url = this.host + bucket + '/' + uid;
       const result = { url, bucket, key: uid };
-      console.log('result is .............', result);
       return result;
     }
   }

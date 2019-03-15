@@ -69,6 +69,8 @@ This microservice subscribes to the following Kafka events by topic:
   - healthCheckCommand
   - versionCommand
 
+**Note**: currently restore and reset is not implemented.
+
 ## Chassis Service
 
 This service uses [chassis-srv](http://github.com/restorecommerce/chassis-srv), a base module for [restorecommerce](https://github.com/restorecommerce) microservices, in order to provide the following functionalities:
@@ -77,10 +79,46 @@ This service uses [chassis-srv](http://github.com/restorecommerce/chassis-srv), 
 provides endpoints for retrieving the system status and resetting/restoring the system in case of failure. These endpoints can be called via gRPC or Kafka events (through the `io.restorecommerce.command` topic).
 - Kafka offset value storage at regular intervals to [Redis](https://redis.io/).
 
-## Usage
+## Development
+
+### Tests
 
 See [tests](test/).
 
 
 **Note**: although any kind of gRPC client can be used to connect to these endpoints, the tests make use of the [grpc-client](https://github.com/restorecommerce/grpc-client),
 a [restorecommerce](https://github.com/restorecommerce) module which allows an application to connect to multiple gRPC endpoints with custom middleware, loadbalancing and retry/timeout support.
+
+## Usage
+
+### Development
+
+- Install dependencies
+
+```sh
+npm install
+```
+
+- Build application
+
+```sh
+# compile the code
+npm run build
+```
+
+- Run application and restart it on changes in the code
+
+```sh
+# Start ostorage-srv backend in dev mode
+npm run dev
+```
+
+### Production
+
+```sh
+# compile the code
+npm run build
+
+# run compiled server
+npm start
+```
