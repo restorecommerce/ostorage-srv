@@ -44,13 +44,16 @@
     "npm-run-all": "^4.1.5",
     "rimraf": "^2.6.3",
     "should": "^13.2.1",
-    "sleep": "^6.0.0"
+    "sleep": "^6.0.0",
+    "tslint": "^5.14.0",
+    "typescript": "^3.3.4000"
   },
   "scripts": {
     "start": "node start.js",
     "dev": "cross-env NODE_ENV=development nodemon start.js",
     "pretest": "npm run tsctests",
-    "test": "npm run mocha",
+    "test": "npm run lint && npm run mocha",
+    "lint": "tslint ./start.ts ./Worker.ts ./oStorageService.ts ./commandInterface.ts",
     "mocha": "cross-env NODE_ENV=test mocha --timeout 15000 -R spec test/test.js --full-trace --exit",
     "tsctests": "tsc test/test.ts --module commonjs -target ES6",
     "test-debug": "cross-env NODE_ENV=test mocha -R spec test/test.js --inspect-brk",
