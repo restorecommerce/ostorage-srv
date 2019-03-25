@@ -53,13 +53,14 @@
     "dev": "cross-env NODE_ENV=development nodemon start.js",
     "pretest": "npm run tsctests",
     "test": "npm run lint && npm run mocha",
-    "lint": "tslint ./start.ts ./Worker.ts ./oStorageService.ts ./commandInterface.ts",
+    "lint": "tslint ./start.ts ./worker.ts ./oStorageService.ts ./commandInterface.ts",
     "mocha": "cross-env NODE_ENV=test mocha --timeout 15000 -R spec test/test.js --full-trace --exit",
     "tsctests": "tsc test/test.ts --module commonjs -target ES6",
     "test-debug": "cross-env NODE_ENV=test mocha -R spec test/test.js --inspect-brk",
+    "coveralls": "istanbul cover ./node_modules/mocha/bin/_mocha --report lcovonly -- -R spec ./test/test.js --exit",
     "postinstall": "tsc -d",
     "build:tsc": "tsc -d",
-    "build:clean": "rimraf service.js start.js",
+    "build:clean": "rimraf *.js",
     "build": "npm-run-all lint build:clean build:tsc"
   },
   "engines": {
