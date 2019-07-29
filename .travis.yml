@@ -24,8 +24,6 @@ before_install:
   - docker logs resource_kafka
   - docker logs resource_redis
   - docker logs resource_minio
-scripts:
-  - 'npm test'
 after_success:
-  - sleep 30
-- npm run coveralls
+  - 'npm run coveralls'
+  - 'cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js'
