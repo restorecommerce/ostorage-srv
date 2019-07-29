@@ -26,6 +26,18 @@ async function stop(): Promise<void> {
   await worker.stop();
 }
 
+const meta = {
+  modified_by: 'SYSTEM',
+  owner: [{
+    id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
+    value: 'urn:restorecommerce:acs:model:user.User'
+  },
+  {
+    id: 'urn:restorecommerce:acs:names:ownerInstance',
+    value: 'UserID'
+  }]
+};
+
 // returns a gRPC service
 async function connect(clientCfg: string, resourceName: string): Promise<any> {
   logger = worker.logger;
@@ -47,26 +59,13 @@ describe('testing ostorage-srv', () => {
     await stop();
   });
 
-  describe('Testing ostorage methods', () => {
-    it('Should be empty', async () => {
+  describe('Object Storage', () => {
+    it('Should be empty initially', async () => {
       oStorage = await connect('grpc-client:service-ostorage', '');
       let result = await oStorage.list();
       should(result.data.file_information).empty;
     });
-
-    it('Should add data to ostorage', async () => {
-      let meta = {
-        modified_by: 'SYSTEM',
-        owner: [{
-          id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
-          value: 'urn:restorecommerce:acs:model:user.User'
-        },
-        {
-          id: 'urn:restorecommerce:acs:names:ownerInstance',
-          value: 'UserID'
-        }]
-      };
-
+    it('Should store the Object', async () => {
       let result = await oStorage.put({
         bucket: 'invoices',
         key: 'test_object_123',
@@ -79,15 +78,47 @@ describe('testing ostorage-srv', () => {
       should.exist(result.data.key);
       sleep.sleep(3);
     });
-
-    it('should list the added files', async () => {
+    it('should get metadata of the Object', async () => {
+      let result = await oStorage.get({
+        key: 'test_object_123',
+        bucket: 'invoices',
+        flag: true
+      });
+      should.exist(result);
+      should.exist(result.data);
+      should.exist(result.data.key);
+      should.exist(result.data.meta.owner);
+      meta.owner.should.deepEqual(result.data.meta.owner);
+      sleep.sleep(3);
+    });
+    it('should get the Object', async () => {
+      let result = await oStorage.get({
+        key: 'test_object_123',
+        bucket: 'invoices'
+      });
+      should.exist(result);
+      should.exist(result.data);
+      should.exist(result.data.key);
+      result.data.key.should.equal('test_object_123');
+      sleep.sleep(3);
+    });
+    it('should list the Object', async () => {
       let result = await oStorage.list({
         bucket: 'invoices'
       });
-      should(result.data.file_information).length(1);
+      should(result.data.object_data).length(1);
       sleep.sleep(3);
     });
-
+    it('should throw an error for invalid bucket request', async () => {
+      let result = await oStorage.list({
+        bucket: 'invalid_bucket'
+      });
+      should.exist(result);
+      should.exist(result.error);
+      should.exist(result.error.details);
+      result.error.details.should.equal('13 INTERNAL: The specified bucket does not exist');
+      sleep.sleep(3);
+    });
     it('should delete the object', async () => {
       let result = await oStorage.delete({
         bucket: 'invoices',

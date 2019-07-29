@@ -1,63 +1,93 @@
 # ostorage-srv
 
-A RestoreCommerce microservice for abstracting object storage through [grpc](https://grpc.io/docs/).
-It uses an [AWS SDK](https://www.npmjs.com/package/aws-sdk) client for connecting to an object storage framework. Currently, objects are stored using [minio](https://www.minio.io/) for local development within a Docker network and [rook](https://rook.io/) on a Kubernettes production environment.
-Asynchronous communication is performed through [Kafka](https://kafka.apache.org/) using the RestoreCommerce [kafka-client](https://github.com/restorecommerce/kafka-client).
+<img src="http://img.shields.io/npm/v/%40restorecommerce%2Fostorage%2Dsrv.svg?style=flat-square" alt="">[![Build Status][build]](https://travis-ci.org/restorecommerce/ostorage-srv?branch=master)[![Dependencies][depend]](https://david-dm.org/restorecommerce/ostorage-srv)[![Coverage Status][cover]](https://coveralls.io/github/restorecommerce/ostorage-srv?branch=master)
+
+[version]: http://img.shields.io/npm/v/ostorage-srv.svg?style=flat-square
+[build]: http://img.shields.io/travis/restorecommerce/ostorage-srv/master.svg?style=flat-square
+[depend]: https://img.shields.io/david/restorecommerce/ostorage-srv.svg?style=flat-square
+[cover]: http://img.shields.io/coveralls/restorecommerce/ostorage-srv/master.svg?style=flat-square
+
+A RestoreCommerce microservice for abstracting object storage through [gRPC](https://grpc.io/docs/).
+It uses an [AWS SDK](https://www.npmjs.com/package/aws-sdk) client for connecting to an object storage framework. 
+The service exposes `put`, `get`, `list` and `delete` operations via gRPC interface.
+This service can be used with Object Storage Server compatible with S3 API and this can be configured in [config.json](./cfg/config.json).
+
 
 ## gRPC Interface
 
 This microservice exposes the following gRPC endpoints:
 
-`io.restorecommerce.ostorage.Service`
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| Put | `io.restorecommerce.ostorage.Object` | `Url` | Return Url of File. |
-| Get | `io.restorecommerce.ostorage.GetRequest` | `io.restorecommerce.ostorage.Object` | Get an object. |
-| Delete | `io.restorecommerce.ostorage.DeleteRequest` | `google.protobuf.Empty` | Delete an object by its key and bucket. |
-|List | `io.restorecommerce.ostorage.List` | `io.restorecommerce.ostorage.FilesInformation` | Return a list of files information. |
-
+#### Put
+Used to store the Object to the Storage Server.
+Requests are performed using `io.restorecommerce.ostorage.Object` protobuf message as input and response is `io.restorecommerce.ostorage.Result` message.
 
 `io.restorecommerce.ostorage.Object`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| bucket | string | required | Bucket to which the object should be mapped to. |
-| key | string | required | Object key. |
-| object | bytes | required | Blob. |
-| meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | required | metadata attached to file.|
-| fileName | string | required | Filename. |
-| url | string | required | url of saved file. |
-| prefix | string | required | Prefix,used to create folder inside aws storage. |
+| bucket | string | required | Bucket to which the object should be mapped to.|
+| object | bytes | required | Blob.|
+| meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object.|
+| key | string | optional | Object Key.|
+
+`io.restorecommerce.ostorage.Result`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| url | string | required | url of saved Object.|
+| bucket | string | required | Bucket to which the object is mapped to.|
+| key | string | optional | Object Key.|
+
+
+#### Get
+Used to retreive the Object from the Storage Server.
+Requests are performed using `io.restorecommerce.ostorage.GetRequest` protobuf message as input and response is `io.restorecommerce.ostorage.Object` message.
 
 `io.restorecommerce.ostorage.GetRequest`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| bucket | string | required | Bucket to which the object should be mapped to. |
-| key | string | required | Object key. |
-| flag | boolean | required | flag to get only metadata of object. |
+| key | string | optional | Object Key.|
+| bucket | string | required | Bucket to which the object is mapped to.|
+| flag | boolean | optional | If flag is set to `true` only metadata of object is fetched.|
 
-`io.restorecommerce.ostorage.DeleteRequest`
+#### List
+Used to list all the Objects in a Bucket from the Storage Server.
+Requests are performed using `io.restorecommerce.ostorage.Bucket` protobuf message as input and response is `io.restorecommerce.ostorage.ObjectsData` message.
 
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| bucket | string | required | Bucket to which the object should be mapped to. |
-| key | string | required | Object key. |
-
-`io.restorecommerce.ostorage.List`
+`io.restorecommerce.ostorage.Bucket`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | bucket | string | optional | If bucket name provied it will return its files otherwise it will return all files. |
 
-`io.restorecommerce.ostorage.FilesInformation`
+
+`io.restorecommerce.ostorage.ObjectsData`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| bucket | string | required | bucket name. |
-| file_name | string | required | file name. |
-| meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | required | meta information of object.|
+| object_data | [ ] `io.restorecommerce.ostorage.ObjectData` | required | Objects data. |
+
+`io.restorecommerce.ostorage.ObjectData`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| url | string | required | url for Object. |
+| object_name | string | required | Object name. |
+| meta | [ ] `google.protobuf.Any` | optional | meta information of object.|
+
+
+#### Delete
+
+Used to delete the Object mapped to the Bucket from the Storage Server.
+Requests are performed using `io.restorecommerce.ostorage.Bucket` protobuf message as input and response is `google.protobuf.Empty` message.
+
+`io.restorecommerce.ostorage.DeleteRequest`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| bucket | string | required | Bucket to which the object is mapped to. |
+| key | string | required | Object key. |
 
 
 ## Kafka Events
@@ -82,8 +112,14 @@ provides endpoints for retrieving the system status and resetting/restoring the 
 ## Development
 
 ### Tests
+See [tests](test/). To execute the tests a running instance of [MinIO](https://min.io/) is needed.
+Refer to [System](https://github.com/restorecommerce/system) repository to start the backing-services before running the tests.
 
-See [tests](test/).
+- To run tests
+
+```sh
+npm run test
+```
 
 
 **Note**: although any kind of gRPC client can be used to connect to these endpoints, the tests make use of the [grpc-client](https://github.com/restorecommerce/grpc-client),
