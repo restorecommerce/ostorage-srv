@@ -10,9 +10,7 @@
       "s3ForcePathStyle": true
     },
     "buckets": [
-      "invoices",
-      "documents",
-      "usercontent"
+      "test"
      ]
   },
   "logger": {

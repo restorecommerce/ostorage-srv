@@ -1,8 +1,7 @@
 import * as _ from 'lodash';
 import * as aws from 'aws-sdk';
-import * as uuid from 'uuid';
 import * as MemoryStream from 'memorystream';
-import { PassThrough, Readable } from 'stream';
+import { PassThrough, Readable, Writable } from 'stream';
 
 export interface GetRequest {
   key: string;
@@ -24,6 +23,12 @@ export interface PutRequest {
   bucket: string;
   meta: any;
   object: Buffer;
+}
+
+export interface PutResponse {
+  key: String;
+  bucket: String;
+  url: String;
 }
 
 export interface Call<T = GetRequest | DeleteRequest | PutRequest> {
@@ -125,7 +130,7 @@ export class OStorageService {
     return objectToReturn;
   }
 
-  async get(call: Call<GetRequest>, context?: any): Promise<any> {
+  async get(call: any, context?: any): Promise<any> {
     const { bucket, key, flag } = call.request;
     if (!_.includes(this.buckets, bucket)) {
       throw new InvalidBucketName(bucket);
@@ -148,23 +153,33 @@ export class OStorageService {
       if (meta && meta.meta) {
         metaObj = JSON.parse(meta.meta);
       }
-      return {
-        meta: metaObj
-      };
+      await call.write({ meta: metaObj });
+      await call.end();
+      return;
     }
 
     this.logger.verbose(`Received a request to get object ${key} on bucket ${bucket}`);
-    const stream = new MemoryStream(null, { readable: false });
-    const object = await new Promise<any>((resolve, reject) => {
-      this.ossClient.getObject({
-        Bucket: bucket,
-        Key: key
-      })
-        .on('httpData', (chunk) => {
-          stream.write(chunk);
+    const stream = new MemoryStream(null);
+    const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
+    stream.pipe(downloadable);
+    await new Promise<any>((resolve, reject) => {
+      downloadable
+        .on('httpData', async (chunk) => {
+          await call.write({ bucket, key, object: chunk, url: this.host + bucket + '/' + key });
         })
-        .on('httpDone', () => {
-          resolve(stream.toBuffer());
+        .on('data', async (chunk) => {
+          await call.write({ bucket, key, object: chunk, url: this.host + bucket + '/' + key });
+        })
+        .on('httpDone', async () => {
+          resolve();
+        })
+        .on('end', async (chunk) => {
+          await call.end();
+          resolve();
+        })
+        .on('finish', async (chunk) => {
+          await call.end();
+          resolve();
         })
         .on('httpError', (err) => {
           this.logger.error('HTTP error ocurred while getting object', { err });
@@ -173,57 +188,86 @@ export class OStorageService {
         .on('error', (err) => {
           this.logger.error('Error ocurred while getting object', { err });
           reject(err);
-        })
-        .send((err, data) => { resolve(); });
+        });
     });
-    const url = this.host + bucket + '/' + key;
-    return {
-      bucket, key, object, url
-    };
+    return;
   }
 
-  async put(call: Call<PutRequest>, context?: any): Promise<any> {
-    let { bucket, key, meta, object } = call.request;
-    // here Key is fileName from request
-    if (!_.includes(this.buckets, bucket)) {
-      throw new InvalidBucketName(bucket);
+  async put(call: any, callback: any): Promise<PutResponse> {
+    let stream = true;
+    let completeBuffer = [];
+    let key, bucket, meta, object;
+    while (stream) {
+      try {
+        let req = await call.read();
+        // Promisify callback to get response
+        req = await new Promise((resolve, reject) => {
+          req((err, response) => {
+            if (err) {
+              reject(err);
+            }
+            resolve(response);
+          });
+        });
+        key = req.key;
+        bucket = req.bucket;
+        meta = req.meta;
+        object = req.object;
+        if (!_.includes(this.buckets, bucket)) {
+          stream = false;
+          throw new InvalidBucketName(bucket);
+        }
+        completeBuffer.push(object);
+      } catch (e) {
+        stream = false;
+        if (e.message === 'stream end') {
+          // store object to storage server using streaming connection
+          const response = this.storeObject(key, bucket, meta,
+            Buffer.concat(completeBuffer));
+          return response;
+        }
+      }
     }
-    if (!key) {
-      key = uuid.v4().replace(/-/g, '');
-    }
-    let metaData = {
-      meta: JSON.stringify(meta),
-      key
-    };
+  }
 
-    this.logger.verbose(`Received a request to store Object ,${key} on bucket ${bucket}`);
-    const readable = new Readable();
-    readable.push(object);
-    readable.push(null);
-    const passStream = new PassThrough();
-    const uploadable = this.ossClient.upload({
-      Bucket: bucket,
-      Key: key,
-      Body: passStream,
-      Metadata: metaData
-    }, (error, data) => { });
-    readable.pipe(passStream);
+  private async storeObject(key: string, bucket: string, meta: any, object: any): Promise<PutResponse> {
+    try {
+      let metaData = {
+        meta: JSON.stringify(meta),
+        key
+      };
 
-    const output = await new Promise<any>((resolve, reject) => {
-      uploadable
-        .on('httpUploadProgress', (chunk) => {
-          if (chunk.loaded == chunk.total) {
-            this.logger.info(`Successfully persisted object ${key}
-                          in bucket ${bucket}`);
-            resolve(true);
-          }
-          else reject();
-        })
-        .send();
-    });
-    if (output) {
-      const url = this.host + bucket + '/' + key;
-      return { url, bucket, key };
+      this.logger.verbose(`Received a request to store Object ,${key} on bucket ${bucket}`);
+      const readable = new Readable();
+      readable.push(object);
+      readable.push(null);
+      const passStream = new PassThrough();
+      const uploadable = this.ossClient.upload({
+        Bucket: bucket,
+        Key: key,
+        Body: passStream,
+        Metadata: metaData
+      }, (error, data) => { });
+      readable.pipe(passStream);
+
+      const output = await new Promise<any>((resolve, reject) => {
+        uploadable
+          .on('httpUploadProgress', (chunk) => {
+            if (chunk.loaded == chunk.total) {
+              this.logger.info(`Successfully persisted object ${key}
+                            in bucket ${bucket}`);
+              resolve(true);
+            }
+          })
+          .send();
+      });
+      if (output) {
+        const url = this.host + bucket + '/' + key;
+        return { url, bucket, key };
+      }
+    } catch (err) {
+      this.logger.error('Error occured when storing Object:', { err });
+      throw err;
     }
   }
 
@@ -248,5 +292,3 @@ export class OStorageService {
     this.logger.info(`Successfully deleted object ${key} from bucket ${bucket}`);
   }
 }
-
-
