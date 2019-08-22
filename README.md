@@ -27,8 +27,8 @@ Requests are performed using `io.restorecommerce.ostorage.Object` protobuf messa
 | ----- | ---- | ----- | ----------- |
 | bucket | string | required | Bucket to which the object should be mapped to.|
 | object | bytes | required | Blob.|
+| key | string | required | Object Key.|
 | meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object.|
-| key | string | optional | Object Key.|
 
 `io.restorecommerce.ostorage.Result`
 
