@@ -61,7 +61,7 @@
     "coveralls": "nyc report --reporter=text-lcov | coveralls",
     "createtopics": "node setupTopics.js io.restorecommerce.command",
     "build:tsc": "tsc -d",
-    "build:clean": "rimraf *.js",
+    "build:clean": "rimraf start.js worker.js oStorageService.js commandInterface.js",
     "build": "npm-run-all lint build:clean build:tsc"
   },
   "engines": {
