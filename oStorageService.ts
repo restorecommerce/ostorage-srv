@@ -237,7 +237,7 @@ export class OStorageService {
         key
       };
 
-      this.logger.verbose(`Received a request to store Object ,${key} on bucket ${bucket}`);
+      this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
       const readable = new Readable();
       readable.push(object);
       readable.push(null);
