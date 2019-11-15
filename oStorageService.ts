@@ -1,7 +1,8 @@
 import * as _ from 'lodash';
 import * as aws from 'aws-sdk';
 import * as MemoryStream from 'memorystream';
-import { PassThrough, Readable, Writable } from 'stream';
+import { PassThrough, Readable } from 'stream';
+import { errors } from '@restorecommerce/chassis-srv';
 
 export interface GetRequest {
   key: string;
@@ -141,10 +142,14 @@ export class OStorageService {
     const params = { Bucket: bucket, Key: key };
     if (flag) {
       const meta: any = await new Promise((resolve, reject) => {
-        this.ossClient.headObject(params, (err, data) => {
+        this.ossClient.headObject(params, async (err: any, data) => {
           if (err) {
-            console.log(err, err.stack);
-            reject(err);
+            // map the s3 error codes to standard chassis-srv errors
+            if (err.code === 'NoSuchKey') {
+              err = new errors.NotFound('The specified key was not found');
+              err.code = 404;
+            }
+            await call.end(err);
           }
           resolve(data.Metadata);
         });
@@ -181,13 +186,23 @@ export class OStorageService {
           await call.end();
           resolve();
         })
-        .on('httpError', (err) => {
+        .on('httpError', async (err: any) => {
           this.logger.error('HTTP error ocurred while getting object', { err });
-          reject(err);
+          // map the s3 error codes to standard chassis-srv errors
+          if (err.code === 'NoSuchKey') {
+            err = new errors.NotFound('The specified key was not found');
+            err.code = 404;
+          }
+          await call.end(err);
         })
-        .on('error', (err) => {
+        .on('error', async (err: any) => {
           this.logger.error('Error ocurred while getting object', { err });
-          reject(err);
+          // map the s3 error codes to standard chassis-srv errors
+          if (err.code === 'NoSuchKey') {
+            err = new errors.NotFound('The specified key was not found');
+            err.code = 404;
+          }
+          await call.end(err);
         });
     });
     return;
@@ -278,6 +293,17 @@ export class OStorageService {
     }
 
     this.logger.verbose(`Received a request to delete object ${key} on bucket ${bucket}`);
+    const objectsList = await this.list(call);
+    let objectExists = false;
+    for (let object of objectsList) {
+      if (object.object_name.indexOf(key) > -1) {
+        objectExists = true;
+        break;
+      }
+    }
+    if (!objectExists) {
+      throw new InvalidKey(key);
+    }
     const result = await this.ossClient.deleteObject({
       Bucket: bucket,
       Key: key
