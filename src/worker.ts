@@ -36,8 +36,7 @@ export class Worker {
     const oss = new OStorageService(cfg.get(), logger);
     const cis = new OStorageCommandInterface(server, cfg.get(), logger, events);
 
-    const eventListener = async function eventListener(msg: any,
-      context: any, config: any, eventName: string): Promise<any> {
+    const eventListener = async (msg: any, context: any, config: any, eventName: string) => {
       // command events
       await cis.command(msg, context);
     };

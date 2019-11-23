@@ -1,5 +1,5 @@
 import * as should from 'should';
-import { Worker } from '../worker';
+import { Worker } from '../lib/worker';
 import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as sconfig from '@restorecommerce/service-config';
