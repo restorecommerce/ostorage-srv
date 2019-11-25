@@ -8,8 +8,6 @@ pid/
 .settings
 .directory
 
-*.js
-*.d.ts
 !setupTopics.js
 
 *.log
