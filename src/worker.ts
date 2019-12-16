@@ -3,7 +3,7 @@ import * as _ from 'lodash';
 import { Events } from '@restorecommerce/kafka-client';
 import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
-import { OStorageService } from './oStorageService';
+import { Service } from './service';
 import { OStorageCommandInterface } from './commandInterface';
 
 export class Worker {
@@ -33,7 +33,7 @@ export class Worker {
     await events.start();
     this.offsetStore = new chassis.OffsetStore(events, cfg, logger);
 
-    const oss = new OStorageService(cfg.get(), logger);
+    const oss = new Service(cfg.get(), logger);
     const cis = new OStorageCommandInterface(server, cfg.get(), logger, events);
 
     const eventListener = async (msg: any, context: any, config: any, eventName: string) => {
