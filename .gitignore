@@ -16,3 +16,8 @@ lib
 *~
 /mc
 .nyc_output
+
+config
+id_rsa
+id_rsa.pub
+known_hosts
