@@ -63,7 +63,7 @@
       "provider": "kafka",
       "groupId": "restore-ostorage-srv",
       "clientId": "restore-ostorage-srv",
-      "kafkaHost": "localhost:9092",
+      "kafkaHost": "localhost:29092",
       "latestOffset": false,
       "restoreCommand": {
         "protos": [
