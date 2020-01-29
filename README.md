@@ -155,7 +155,7 @@ docker run \
  --hostname ostorage-srv \
  --network=system_test \
  -e NODE_ENV=production \
- -p 50051:50051 \
+ -p 50066:50066 \
  restorecommerce/ostorage-srv
 ```
 
