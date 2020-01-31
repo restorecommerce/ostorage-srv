@@ -170,7 +170,7 @@
           "io/restorecommerce/commandinterface.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "addr": "localhost:50068"
+        "addr": "localhost:50066"
       }
     ]
   },
