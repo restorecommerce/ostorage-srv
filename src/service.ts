@@ -134,10 +134,10 @@ export class Service {
   async get(call: any, context?: any): Promise<any> {
     const { bucket, key, flag } = call.request;
     if (!_.includes(this.buckets, bucket)) {
-      throw new InvalidBucketName(bucket);
+      return await call.end(new InvalidBucketName(bucket));
     }
     if (!key) {
-      throw new InvalidKey(key);
+      return await call.end(new InvalidKey(key));
     }
     const params = { Bucket: bucket, Key: key };
     if (flag) {
