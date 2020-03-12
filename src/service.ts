@@ -145,11 +145,12 @@ export class Service {
         this.ossClient.headObject(params, async (err: any, data) => {
           if (err) {
             // map the s3 error codes to standard chassis-srv errors
-            if (err.code === 'NoSuchKey') {
+            if (err.code === 'NotFound') {
               err = new errors.NotFound('The specified key was not found');
               err.code = 404;
             }
-            await call.end(err);
+            this.logger.error('Error occured retreiving metat data for key:', { key, error: err });
+            return await call.end(err);
           }
           resolve(data.Metadata);
         });
@@ -189,7 +190,7 @@ export class Service {
         .on('httpError', async (err: any) => {
           this.logger.error('HTTP error ocurred while getting object', { err });
           // map the s3 error codes to standard chassis-srv errors
-          if (err.code === 'NoSuchKey') {
+          if (err.code === 'NotFound') {
             err = new errors.NotFound('The specified key was not found');
             err.code = 404;
           }
@@ -198,7 +199,7 @@ export class Service {
         .on('error', async (err: any) => {
           this.logger.error('Error ocurred while getting object', { err });
           // map the s3 error codes to standard chassis-srv errors
-          if (err.code === 'NoSuchKey') {
+          if (err.code === 'NotFound') {
             err = new errors.NotFound('The specified key was not found');
             err.code = 404;
           }
