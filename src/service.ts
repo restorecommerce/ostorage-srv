@@ -3,6 +3,9 @@ import * as aws from 'aws-sdk';
 import * as MemoryStream from 'memorystream';
 import { PassThrough, Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
+import { toObject } from '@restorecommerce/resource-base-interface/lib';
+
+
 
 export interface GetRequest {
   key: string;
@@ -10,13 +13,15 @@ export interface GetRequest {
   flag: boolean;
 }
 
-export interface ListBucket {
+export interface ListRequest {
   bucket: string;
+  filter: any;
 }
 
 export interface DeleteRequest {
   key: string;
   bucket: string;
+  filter: any;
 }
 
 export interface PutRequest {
@@ -83,8 +88,20 @@ export class Service {
     }
   }
 
-  async list(call: Call<ListBucket>, context?: any): Promise<any> {
-    const { bucket } = call.request;
+  async list(call: Call<ListRequest>, context?: any): Promise<any> {
+    let { bucket, filter }  = call.request;
+
+    // if request contains a filter return data based on it
+    let hasFilter = false;
+    let filterField, filterOperation, filterValue: any;
+    if (filter) {
+      hasFilter = true;
+      // convert filter from struct back to object
+      filter = toObject(filter);
+      filterField = filter.field;
+      filterOperation = filter.operation;
+      filterValue = filter.value;
+    }
     let buckets = [];
     if (bucket) {
       buckets.push(bucket);
@@ -123,7 +140,16 @@ export class Service {
               objectMeta = JSON.parse(meta.meta);
             }
             let object = { object_name: objectName, url, meta: objectMeta };
-            objectToReturn.push(object);
+
+            // if filter is provided return data based on filter
+            if (hasFilter && filterField == 'meta.owner' && filterOperation == 'eq' && filterValue) {
+              const checkedVal = object.meta.owner[1].value;
+              if (filterValue == checkedVal) {
+                objectToReturn.push(object);
+              }
+            } else { // else return all data
+              objectToReturn.push(object);
+            }
           }
         }
       }
