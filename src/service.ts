@@ -3,9 +3,32 @@ import * as aws from 'aws-sdk';
 import * as MemoryStream from 'memorystream';
 import { PassThrough, Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
-import { toObject } from '@restorecommerce/resource-base-interface/lib';
+import { toObject } from '@restorecommerce/resource-base-interface';
 
+const META_OWNER = 'meta.owner';
+const EQ = 'eq';
 
+export enum Operation {
+  GT = 'gt',
+  LT = 'lt',
+  LTE = 'lte',
+  GTE = 'gte',
+  EQ = 'eq',
+  IS_EMPTY = 'isEmpty',
+  IN = 'in',
+  iLIKE = 'iLike'
+}
+
+export interface FilterType {
+  field?: string;
+  value?: string;
+  operation: Operation;
+}
+
+export interface RequestType {
+  bucket: string;
+  filter?: FilterType;
+}
 
 export interface GetRequest {
   key: string;
@@ -15,13 +38,13 @@ export interface GetRequest {
 
 export interface ListRequest {
   bucket: string;
-  filter: any;
+  filter: FilterType;
 }
 
 export interface DeleteRequest {
   key: string;
   bucket: string;
-  filter: any;
+  filter: FilterType;
 }
 
 export interface PutRequest {
@@ -88,19 +111,16 @@ export class Service {
     }
   }
 
-  async list(call: Call<ListRequest>, context?: any): Promise<any> {
-    let { bucket, filter }  = call.request;
+  async list(request: Call<ListRequest>, context?: any): Promise<any> {
+    let { bucket, filter }  = request.request;
 
     // if request contains a filter return data based on it
     let hasFilter = false;
-    let filterField, filterOperation, filterValue: any;
+    let requestFilter;
     if (filter) {
       hasFilter = true;
       // convert filter from struct back to object
-      filter = toObject(filter);
-      filterField = filter.field;
-      filterOperation = filter.operation;
-      filterValue = filter.value;
+      requestFilter = toObject(filter);
     }
     let buckets = [];
     if (bucket) {
@@ -142,9 +162,10 @@ export class Service {
             let object = { object_name: objectName, url, meta: objectMeta };
 
             // if filter is provided return data based on filter
-            if (hasFilter && filterField == 'meta.owner' && filterOperation == 'eq' && filterValue) {
-              const checkedVal = object.meta.owner[1].value;
-              if (filterValue == checkedVal) {
+            if (hasFilter && requestFilter.field == META_OWNER && requestFilter.operation == EQ && requestFilter.value) {
+              const MetaOwnerVal = object.meta.owner[1].value;
+              // check only for the files matching the requested Owner Organizations
+              if (requestFilter.value == MetaOwnerVal) {
                 objectToReturn.push(object);
               }
             } else { // else return all data

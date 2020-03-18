@@ -99,4 +99,3 @@ if (require.main === module) {
     });
   });
 }
-
