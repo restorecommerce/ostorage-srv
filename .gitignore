@@ -4,6 +4,7 @@ npm-debug.log
 coverage/
 pid/
 
+.idea
 .project
 .settings
 .directory
