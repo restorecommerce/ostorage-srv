@@ -19,6 +19,16 @@ export enum Operation {
   iLIKE = 'iLike'
 }
 
+export interface Options {
+  encoding?: string;
+  content_type?: string;
+  content_language?: string;
+  content_disposition?: string;
+  content_length?: number;
+  version?: string;
+  md5?: string;
+}
+
 export interface FilterType {
   field?: string;
   value?: string;
@@ -58,6 +68,7 @@ export interface PutResponse {
   key: String;
   bucket: String;
   url: String;
+  options?: Options;
 }
 
 export interface Call<T = GetRequest | DeleteRequest | PutRequest> {
@@ -179,7 +190,8 @@ export class Service {
   }
 
   async get(call: any, context?: any): Promise<any> {
-    const { bucket, key, flag } = call.request;
+    const { bucket, key, downloadFile, flag } = call.request;
+    console.log('***get call.request=', call.request);
     if (!_.includes(this.buckets, bucket)) {
       throw new InvalidBucketName(bucket);
     }
@@ -188,6 +200,7 @@ export class Service {
     }
     const params = { Bucket: bucket, Key: key };
     if (flag) {
+      console.log('***flag=', flag);
       const meta: any = await new Promise((resolve, reject) => {
         this.ossClient.headObject(params, async (err: any, data) => {
           if (err) {
@@ -201,15 +214,30 @@ export class Service {
           resolve(data.Metadata);
         });
       });
-      let metaObj;
+      console.log('****get meta=', meta);
+
+      let metaObj: any;
       if (meta && meta.meta) {
+        console.log('meta.meta=', meta.meta);
         metaObj = JSON.parse(meta.meta);
       }
-      await call.write({ meta: metaObj });
+      let optionsObj: any;
+      if (meta && meta.options) {
+        console.log('meta.options=', meta.options);
+        optionsObj = JSON.parse(meta.options);
+        if (optionsObj.content_disposition && downloadFile == true) {
+          optionsObj.content_disposition = 'attachment';
+        } else {
+          optionsObj.content_disposition = 'inline';
+        }
+        console.log('***optionsObj=', optionsObj);
+
+      }
+      await call.write({ meta: metaObj, options: optionsObj});
       await call.end();
       return;
     }
-
+    console.log('this runs -------------');
     this.logger.verbose(`Received a request to get object ${key} on bucket ${bucket}`);
     const stream = new MemoryStream(null);
     const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
@@ -258,7 +286,7 @@ export class Service {
   async put(call: any, callback: any): Promise<PutResponse> {
     let stream = true;
     let completeBuffer = [];
-    let key, bucket, meta, object;
+    let key, bucket, meta, object, options;
     while (stream) {
       try {
         let req = await call.read();
@@ -271,9 +299,12 @@ export class Service {
             resolve(response);
           });
         });
+        console.log('***put req', req);
         key = req.key;
         bucket = req.bucket;
         meta = req.meta;
+        console.log('***meta=', meta);
+        options = req.options;
         object = req.object;
         if (!_.includes(this.buckets, bucket)) {
           stream = false;
@@ -284,21 +315,23 @@ export class Service {
         stream = false;
         if (e.message === 'stream end') {
           // store object to storage server using streaming connection
-          const response = this.storeObject(key, bucket, meta,
+          const response = await this.storeObject(key, bucket, meta, options,
             Buffer.concat(completeBuffer));
+          console.log('***response=', JSON.stringify(response));
           return response;
         }
       }
     }
   }
 
-  private async storeObject(key: string, bucket: string, meta: any, object: any): Promise<PutResponse> {
+  private async storeObject(key: string, bucket: string, meta: any, options: Options, object: any): Promise<PutResponse> {
     try {
       let metaData = {
         meta: JSON.stringify(meta),
-        key
+        key,
+        options: JSON.stringify(options)
       };
-
+      console.log('metaData to be stored=', metaData);
       this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
       const readable = new Readable();
       readable.push(object);
@@ -308,7 +341,7 @@ export class Service {
         Bucket: bucket,
         Key: key,
         Body: passStream,
-        Metadata: metaData
+        Metadata: metaData,
       }, (error, data) => { });
       readable.pipe(passStream);
 
@@ -325,7 +358,9 @@ export class Service {
       });
       if (output) {
         const url = this.host + bucket + '/' + key;
-        return { url, bucket, key };
+        const ret =  { url, key, bucket, meta };
+        console.log('***ret=', ret);
+        return ret;
       }
     } catch (err) {
       this.logger.error('Error occured when storing Object:', { err });
