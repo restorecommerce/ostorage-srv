@@ -24,7 +24,7 @@ export interface Options {
   content_type?: string;
   content_language?: string;
   content_disposition?: string;
-  content_length?: number;
+  length?: number;
   version?: string;
   md5?: string;
 }
@@ -326,6 +326,12 @@ export class Service {
         Key: key,
         Body: passStream,
         Metadata: metaData,
+        // ContentEncoding: options.encoding,
+        // ContentType: options.content_type,
+        // ContentLanguage: options.content_language,
+        // ContentDisposition: options.content_disposition, // we assign this in the client-side (attachment or inline)
+        // ContentLength: options.length, // not needed as this is automatically computed when uploading the file
+        // ContentMD5: options.md5 // Md5 is optional
       }, (error, data) => { });
       readable.pipe(passStream);
 
