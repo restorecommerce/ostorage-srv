@@ -190,46 +190,88 @@ export class Service {
   }
 
   async get(call: any, context?: any): Promise<any> {
-    const { bucket, key, flag } = call.request;
+    // get gRPC call request
+    const { bucket, key, flag, download } = call.request;
     if (!_.includes(this.buckets, bucket)) {
       throw new InvalidBucketName(bucket);
     }
     if (!key) {
       throw new InvalidKey(key);
     }
+    // get metadata of the object stored in the S3 object storage
     const params = { Bucket: bucket, Key: key };
+    let headObject: any;
     if (flag) {
-      const meta: any = await new Promise((resolve, reject) => {
+      headObject = await new Promise((resolve, reject) => {
         this.ossClient.headObject(params, async (err: any, data) => {
           if (err) {
             // map the s3 error codes to standard chassis-srv errors
-            if (err.code === 'NoSuchKey') {
+            if (err.code === 'NotFound') {
               err = new errors.NotFound('The specified key was not found');
               err.code = 404;
             }
-            await call.end(err);
+            this.logger.error('Error occured retreiving metadata data for key:', { key, error: err });
+            return await call.end(err);
           }
-          resolve(data.Metadata);
+          resolve(data);
         });
       });
 
-      let metaObj: any;
-      if (meta && meta.meta) {
-        metaObj = JSON.parse(meta.meta);
+      // capture meta data from response message
+      let metaObj;
+      if (headObject && headObject.Metadata && headObject.Metadata.meta) {
+        metaObj = JSON.parse(headObject.Metadata.meta);
       }
-      let optionsObj: any;
-      if (meta && meta.options) {
-        optionsObj = JSON.parse(meta.options);
 
+      // capture options from response headers
+      // these options are added with the put method
+      // with the help of the storeObject() which is
+      // using the s3.upload() method
+      let encoding, content_type, content_language, content_disposition, length, version, md5;
+      if (headObject) {
+        if (headObject.ContentEncoding) {
+          encoding = headObject.ContentEncoding;
+        }
+        if (headObject.ContentType) {
+          content_type = headObject.ContentType;
+        }
+        if (headObject.ContentLanguage) {
+          content_language = headObject.ContentLanguage;
+        }
+        // check download param
+        if (download) {
+          content_disposition = 'attachment';
+        } else {
+          content_disposition = 'inline';
+        }
+        if (headObject.ContentLength) {
+          length = headObject.ContentLength;
+        }
+        if (headObject.ETag) {
+          version = headObject.ETag;
+        }
+        if (headObject.MD5) {
+          md5 = headObject.MD5;
+        }
+      } else {
+        console.log('No headObject found!');
       }
-      await call.write({ meta: metaObj, options: optionsObj});
+      const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5 };
+
+      // write meta data and options to the gRPC call
+      await call.write({ meta: metaObj, options:optionsObj });
       await call.end();
       return;
     }
+
     this.logger.verbose(`Received a request to get object ${key} on bucket ${bucket}`);
+
+    // retrieve object from Amazon S3
+    // and create stream from it
     const stream = new MemoryStream(null);
     const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
     stream.pipe(downloadable);
+    // write data to gRPC call
     await new Promise<any>((resolve, reject) => {
       downloadable
         .on('httpData', async (chunk) => {
@@ -289,9 +331,9 @@ export class Service {
         });
         key = req.key;
         bucket = req.bucket;
+        object = req.object;
         meta = req.meta;
         options = req.options;
-        object = req.object;
         if (!_.includes(this.buckets, bucket)) {
           stream = false;
           throw new InvalidBucketName(bucket);
@@ -301,37 +343,46 @@ export class Service {
         stream = false;
         if (e.message === 'stream end') {
           // store object to storage server using streaming connection
-          const response = await this.storeObject(key, bucket, meta, options,
-            Buffer.concat(completeBuffer));
+          const response = await this.storeObject(
+            key,
+            bucket,
+            Buffer.concat(completeBuffer), // object
+            meta,
+            options
+          );
           return response;
         }
       }
     }
   }
 
-  private async storeObject(key: string, bucket: string, meta: any, options: Options, object: any): Promise<PutResponse> {
+  private async storeObject(key: string, bucket: string, object: any, meta: any, options: Options): Promise<PutResponse> {
     try {
       let metaData = {
         meta: JSON.stringify(meta),
         key,
-        options: JSON.stringify(options)
       };
       this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
       const readable = new Readable();
       readable.push(object);
       readable.push(null);
       const passStream = new PassThrough();
+
+      // write headers to the S3 object
       const uploadable = this.ossClient.upload({
-        Bucket: bucket,
         Key: key,
+        Bucket: bucket,
         Body: passStream,
         Metadata: metaData,
-        // ContentEncoding: options.encoding,
-        // ContentType: options.content_type,
-        // ContentLanguage: options.content_language,
-        // ContentDisposition: options.content_disposition, // we assign this in the client-side (attachment or inline)
-        // ContentLength: options.length, // not needed as this is automatically computed when uploading the file
-        // ContentMD5: options.md5 // Md5 is optional
+        // options:
+        ContentEncoding: options.encoding,
+        ContentType: options.content_type,
+        ContentLanguage: options.content_language,
+        ContentDisposition: options.content_disposition,
+        // if length is given then this is rejected because the file size
+        // does not match the automatically computed file size
+        // ContentLength: options.length,
+        // ContentMD5: options.md5 // deal with this case later
       }, (error, data) => { });
       readable.pipe(passStream);
 

@@ -45,7 +45,7 @@ module.exports = {
     ],
     "capitalized-comments": 0,
     "quotes": ["error", "single", { "allowTemplateLiterals": true }],
-    "no-trailing-spaces": "error",
+    // "no-trailing-spaces": "error",
     "no-var": "error",
     "object-shorthand": "error",
     "prefer-arrow-functions/prefer-arrow-functions": [
