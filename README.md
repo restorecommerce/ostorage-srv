@@ -38,6 +38,7 @@ Requests are performed using `io.restorecommerce.ostorage.Object` protobuf messa
 | object | bytes | required | Blob.|
 | key | string | required | Object Key.|
 | meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object.|
+| options | [io.restorecommerce.ostorage.Options](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto) | optional | headers attached to Object.|
 
 `io.restorecommerce.ostorage.Response`
 
@@ -46,10 +47,10 @@ Requests are performed using `io.restorecommerce.ostorage.Object` protobuf messa
 | url | string | required | url of saved Object.|
 | bucket | string | required | Bucket to which the object is mapped to.|
 | key | string | optional | Object Key.|
-
+| meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object.|
 ### `Get`
 
-Used to retreive the Object from the Storage Server.
+Used to retrieve the Object from the Storage Server.
 Requests are performed using `io.restorecommerce.ostorage.GetRequest` protobuf message as input and response is `io.restorecommerce.ostorage.Object` message.
 
 `io.restorecommerce.ostorage.GetRequest`
@@ -59,17 +60,19 @@ Requests are performed using `io.restorecommerce.ostorage.GetRequest` protobuf m
 | key | string | optional | Object Key.|
 | bucket | string | required | Bucket to which the object is mapped to.|
 | flag | boolean | optional | If flag is set to `true` only metadata of object is fetched.|
+| download | boolean | optional | If flag is set to `true` then Content-Disposition is set as `attachment` else is set as `inline`.|
 
 ### `List`
 
 Used to list all the Objects in a Bucket from the Storage Server.
-Requests are performed using `io.restorecommerce.ostorage.Bucket` protobuf message as input and response is `io.restorecommerce.ostorage.ObjectsData` message.
+Requests are performed using `io.restorecommerce.ostorage.ListRequest` protobuf message as input and response is `io.restorecommerce.ostorage.ObjectsData` message.
 
-`io.restorecommerce.ostorage.Bucket`
+`io.restorecommerce.ostorage.ListRequest`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | bucket | string | optional | If bucket name provied it will return its files otherwise it will return all files. |
+| filter | google.protobuf.Struct | optional | Filter based on fieldName, operation, value. |
 
 `io.restorecommerce.ostorage.ObjectsData`
 
@@ -83,7 +86,7 @@ Requests are performed using `io.restorecommerce.ostorage.Bucket` protobuf messa
 | ----- | ---- | ----- | ----------- |
 | url | string | required | url for Object. |
 | object_name | string | required | Object name. |
-| meta | [ ] `google.protobuf.Any` | optional | meta information of object.|
+| meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object.|
 
 ### `Delete`
 

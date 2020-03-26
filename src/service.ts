@@ -158,7 +158,6 @@ export class Service {
             const meta: any = await new Promise((resolve, reject) => {
               this.ossClient.headObject(headobjectParams, (err, data) => {
                 if (err) {
-                  console.log(err, err.stack);
                   reject(err);
                 }
                 resolve(data.Metadata);
@@ -253,8 +252,6 @@ export class Service {
         if (headObject.MD5) {
           md5 = headObject.MD5;
         }
-      } else {
-        console.log('No headObject found!');
       }
       const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5 };
 
