@@ -38,6 +38,16 @@ const meta = {
   }]
 };
 
+const options = {
+  encoding: 'gzip',
+  content_type: "application/pdf",
+  content_language: "en-UK",
+  content_disposition: "inline",
+  length: 1,
+  version: "v1.0",
+  md5: 'd131dd02c5e6eec4'
+};
+
 // returns a gRPC service
 async function connect(clientCfg: string, resourceName: string): Promise<any> {
   logger = worker.logger;
@@ -78,7 +88,8 @@ describe('testing ostorage-srv', () => {
           bucket: 'test',
           key: 'config.json',
           object: chunk,
-          meta
+          meta,
+          options
         };
         await call.write(data);
       });
@@ -95,7 +106,6 @@ describe('testing ostorage-srv', () => {
           return response;
         });
       });
-
       should(response.error).null;
       should.exist(response.bucket);
       should.exist(response.key);

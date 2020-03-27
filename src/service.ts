@@ -247,10 +247,10 @@ export class Service {
           length = headObject.ContentLength;
         }
         if (headObject.ETag) {
-          version = headObject.ETag;
+          md5 = headObject.ETag;
         }
-        if (headObject.MD5) {
-          md5 = headObject.MD5;
+        if (headObject['x-amz-version-id']) {
+          version = headObject['x-amz-version-id'];
         }
       }
       const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5 };
@@ -376,10 +376,6 @@ export class Service {
         ContentType: options.content_type,
         ContentLanguage: options.content_language,
         ContentDisposition: options.content_disposition,
-        // if length is given then this is rejected because the file size
-        // does not match the automatically computed file size
-        // ContentLength: options.length,
-        // ContentMD5: options.md5 // deal with this case later
       }, (error, data) => { });
       readable.pipe(passStream);
 
