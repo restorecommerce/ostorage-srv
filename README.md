@@ -48,7 +48,7 @@ Requests are performed using `io.restorecommerce.ostorage.Object` protobuf messa
 | content_type | string | required | ContentType header - A standard MIME type describing the format of the contents.|
 | content_language | string | required | ContentLanguage header - The language the content is in.|
 | content_disposition | string | optional | ContentDisposition header - Specifies presentational information for the object.|
-| length | int32 | optional | ContentLength header - Size of the body in bytes. This parameter is useful when the size of the body cannot be determined automatically.|
+| length | int32 | optional | ContentLength header - Content size in bytes. This parameter is useful when the content size cannot be determined automatically.|
 | version | string | optional | x-amz-version-id header - Version ID of the newly created object, in case the bucket has versioning turned on.|
 | md5 | string | optional | ETag - Entity tag that identifies the newly created object's data.|
 
