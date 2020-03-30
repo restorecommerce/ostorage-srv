@@ -40,6 +40,18 @@ Requests are performed using `io.restorecommerce.ostorage.Object` protobuf messa
 | meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object.|
 | options | [io.restorecommerce.ostorage.Options](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto) | optional | headers attached to Object.|
 
+`io.restorecommerce.ostorage.Options`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| encoding | string | optional | ContentEncoding header - Specifies what content encodings have been applied to the object and thus what decoding mechanisms must be applied to obtain the media-type referenced by the Content-Type header field.|
+| content_type | string | required | ContentType header - A standard MIME type describing the format of the contents.|
+| content_language | string | required | ContentLanguage header - The language the content is in.|
+| content_disposition | string | optional | ContentDisposition header - Specifies presentational information for the object.|
+| length | int32 | optional | ContentLength header - Size of the body in bytes. This parameter is useful when the size of the body cannot be determined automatically.|
+| version | string | optional | x-amz-version-id header - Version ID of the newly created object, in case the bucket has versioning turned on.|
+| md5 | string | optional | ETag - Entity tag that identifies the newly created object's data.|
+
 `io.restorecommerce.ostorage.Response`
 
 | Field | Type | Label | Description |
