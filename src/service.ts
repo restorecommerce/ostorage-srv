@@ -106,9 +106,9 @@ export class Service {
         });
         if (AllObjects != null) {
           for (let eachObj of AllObjects) {
-            const headobjectParams = { Bucket: value, Key: eachObj.Key };
+            const headObjectParams = { Bucket: value, Key: eachObj.Key };
             const meta: any = await new Promise((resolve, reject) => {
-              this.ossClient.headObject(headobjectParams, (err, data) => {
+              this.ossClient.headObject(headObjectParams, (err, data) => {
                 if (err) {
                   console.log(err, err.stack);
                   reject(err);
@@ -149,7 +149,7 @@ export class Service {
               err = new errors.NotFound('The specified key was not found');
               err.code = 404;
             }
-            this.logger.error('Error occured retreiving metat data for key:', { key, error: err });
+            this.logger.error('Error occurred retrieving metadata for key:', { key, error: err });
             return await call.end(err);
           }
           resolve(data.Metadata);
@@ -188,7 +188,7 @@ export class Service {
           resolve();
         })
         .on('httpError', async (err: any) => {
-          this.logger.error('HTTP error ocurred while getting object', { err });
+          this.logger.error('HTTP error occurred while getting object', { err });
           // map the s3 error codes to standard chassis-srv errors
           if (err.code === 'NotFound') {
             err = new errors.NotFound('The specified key was not found');
@@ -197,7 +197,7 @@ export class Service {
           await call.end(err);
         })
         .on('error', async (err: any) => {
-          this.logger.error('Error ocurred while getting object', { err });
+          this.logger.error('Error occurred while getting object', { err });
           // map the s3 error codes to standard chassis-srv errors
           if (err.code === 'NotFound') {
             err = new errors.NotFound('The specified key was not found');
@@ -282,7 +282,7 @@ export class Service {
         return { url, bucket, key };
       }
     } catch (err) {
-      this.logger.error('Error occured when storing Object:', { err });
+      this.logger.error('Error occurred when storing Object:', { err });
       throw err;
     }
   }
