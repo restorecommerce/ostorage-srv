@@ -209,7 +209,7 @@ export class Service {
               err = new errors.NotFound('The specified key was not found');
               err.code = 404;
             }
-            this.logger.error('Error occurred retrieving metadata data for key:', { key, error: err });
+            this.logger.error('Error occurred retrieving metadata for key:', { key, error: err });
             return await call.end(err);
           }
           resolve(data);
