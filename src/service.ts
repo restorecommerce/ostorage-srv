@@ -372,10 +372,10 @@ export class Service {
         Body: passStream,
         Metadata: metaData,
         // options:
-        ContentEncoding: options.encoding,
-        ContentType: options.content_type,
-        ContentLanguage: options.content_language,
-        ContentDisposition: options.content_disposition,
+        ContentEncoding: options && options.encoding,
+        ContentType: options && options.content_type,
+        ContentLanguage: options && options.content_language,
+        ContentDisposition: options && options.content_disposition,
       }, (error, data) => { });
       readable.pipe(passStream);
 
