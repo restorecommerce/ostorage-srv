@@ -192,10 +192,10 @@ export class Service {
     // get gRPC call request
     const { bucket, key, flag, download } = call.request;
     if (!_.includes(this.buckets, bucket)) {
-      throw new InvalidBucketName(bucket);
+      return await call.end(new InvalidBucketName(bucket));
     }
     if (!key) {
-      throw new InvalidKey(key);
+      return await call.end(new InvalidKey(key));
     }
     // get metadata of the object stored in the S3 object storage
     const params = { Bucket: bucket, Key: key };
@@ -291,7 +291,7 @@ export class Service {
         .on('httpError', async (err: any) => {
           this.logger.error('HTTP error occurred while getting object', { err });
           // map the s3 error codes to standard chassis-srv errors
-          if (err.code === 'NoSuchKey') {
+          if (err.code === 'NotFound') {
             err = new errors.NotFound('The specified key was not found');
             err.code = 404;
           }
@@ -300,7 +300,7 @@ export class Service {
         .on('error', async (err: any) => {
           this.logger.error('Error occurred while getting object', { err });
           // map the s3 error codes to standard chassis-srv errors
-          if (err.code === 'NoSuchKey') {
+          if (err.code === 'NotFound') {
             err = new errors.NotFound('The specified key was not found');
             err.code = 404;
           }
