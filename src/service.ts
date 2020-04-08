@@ -162,8 +162,6 @@ export class Service {
         // Create a separate list only with the bucket names found in the configurations
         cfgBucketNamesList.push(cfg.Bucket);
       }
-      // console.log('cfgBucketNames=', cfgBucketNamesList);
-      // console.log('this is map result=', nameCfgMapping);
       let cfgToAddMapping = new Map(); // this mapping holds which cfg should be added to obj storage
       let cfgToRemoveMapping = new Map(); // this mapping holds which cfg should be removed from obj storage
 
@@ -172,54 +170,37 @@ export class Service {
       // based on configurations given and existing buckets
       for (let i = 0; i < cfgBucketNamesList.length; i++) {
         for (let j = 0; j < bucketsList.length; j++) {
-          // console.log('i=', i);
-          // console.log('j=', j);
 
           // If cfg bucket name is the same as the existing bucket name
           // then add the name to the cfgToAddMapping
           if (cfgBucketNamesList[i] == bucketsList[j]) {
 
-            // console.log('ADDING ', cfgBucketNamesList[i], 'TO ADD LIST');
             cfgToAddMapping.set(cfgBucketNamesList[i], 0);
 
             // When adding a new element to cfgToAddMapping this means we have a match
             // so we remove it from cfgToRemoveMapping if found already inside
             if (cfgToRemoveMapping.has(cfgBucketNamesList[i])) {
-              // console.log('AND REMOVING ', cfgBucketNamesList[i], 'FROM REMOVE LIST');
               cfgToRemoveMapping.delete(cfgBucketNamesList[i]);
             }
             break;
           } else {
-            // console.log('ADDING ', cfgBucketNamesList[i], 'TO REMOVE LIST');
             cfgToRemoveMapping.set(cfgBucketNamesList[i], 0);
           }
 
         }
       }
-      // console.log('cfgToAddMapping=', cfgToAddMapping);
-      // console.log('cfgToRemoveMapping=', cfgToRemoveMapping);
 
       // Step 2.
       // Double check if there are any existing buckets
       // which have no configuration provided. If so,
       // add these to the cfgToRemoveMapping too!
       for (let k = 0; k < bucketsList.length; k++) {
-        // console.log('is this running ?');
-        console.log('bucketsList=', bucketsList);
-        console.log('cfgToAddMapping=', cfgToAddMapping);
-        console.log('bucketsList[k]=', bucketsList[k]);
-
-
         // If bucket doesn't have any configuration provided
         // try to remove the pre-existing configuration!
         if (!cfgToAddMapping.has(bucketsList[k])) {
-          console.log('ADDING ', bucketsList[k], 'TO REMOVE LIST AS NO CFG PROVIDED!');
           cfgToRemoveMapping.set(bucketsList[k], 0);
-          console.log('cfgToRemoveMapping=', cfgToRemoveMapping);
         }
       }
-      // console.log('cfgToAddMapping=', cfgToAddMapping);
-      // console.log('cfgToRemoveMapping=', cfgToRemoveMapping);
 
       // Step 3.
       // Finally after sorting the configurations,
@@ -229,8 +210,6 @@ export class Service {
       // Iterate over cfgToAddMapping keys and PUT the configurations
       let lifecycleParams;
       for (let cfgToAdd of cfgToAddMapping.keys()) {
-        // console.log('cfgToAdd=', cfgToAdd);
-        // console.log('typeof cfgToAdd=', typeof cfgToAdd);
 
         bucketParam = {
           Bucket: cfgToAdd
@@ -238,8 +217,6 @@ export class Service {
 
         // Take configuration obj from Mapping
         lifecycleParams = nameCfgMapping.get(cfgToAdd); // this object contains all the required params
-        // console.log('nameCfgMapping===', nameCfgMapping);
-        // console.log('lifecycleParams===', lifecycleParams);
         await new Promise((resolve, reject) => {
           this.ossClient.putBucketLifecycleConfiguration(lifecycleParams, (err, data) => {
             if (err) { // an error occurred
@@ -261,7 +238,6 @@ export class Service {
       // 3.2
       // Iterate over cfgToRemoveMapping keys and DELETE the configurations
       for (let cfgToRemove of cfgToRemoveMapping.keys()) {
-        console.log('cfgToRemove=',cfgToRemove);
         bucketParam = {
           Bucket: cfgToRemove
         };
