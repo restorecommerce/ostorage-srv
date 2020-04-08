@@ -9,6 +9,69 @@
     "buckets": [
       "invoices",
       "usercontent"
+    ],
+    "bucketsLifecycleConfigs" : [
+      {
+        "Bucket": "invoices",
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Status": "Enabled",
+              "Expiration": {
+                "Date": "2019-05-30T00:00:00.000Z"
+              },
+              "Filter": {
+                "Prefix": "/Test"
+              },
+              "ID": "Delete all files(or folders) from invoices bucket which names begin with \\'Test\\'"
+            },
+            {
+              "Status": "Enabled",
+              "Expiration": {
+                "Date": "2019-05-30T00:00:00.000Z"
+              },
+              "Filter": {
+                "Prefix": "/00Test"
+              },
+              "ID": "Delete all files(or folders) from invoices which names begin with \\'00Test\\'"
+            }
+          ]
+        }
+      },
+      {
+        "Bucket": "usercontent",
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Status": "Enabled",
+              "Expiration": {
+                "Date": "2019-05-30T00:00:00.000Z"
+              },
+              "Filter": {
+                "Prefix": "/Test"
+              },
+              "ID": "Delete all files(or folders) from usercontent which names begin with \\'Test\\'"
+            }
+          ]
+        }
+      },
+      {
+        "Bucket": "abc",
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Status": "Enabled",
+              "Expiration": {
+                "Date": "2019-05-30T00:00:00.000Z"
+              },
+              "Filter": {
+                "Prefix": "/Test"
+              },
+              "ID": "Delete all files(or folders) from usercontent which names begin with \\'Test\\'"
+            }
+          ]
+        }
+      }
     ]
   },
   "redis": {
