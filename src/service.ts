@@ -288,6 +288,8 @@ export class Service {
           });
         });
       }
+    } else {
+      this.logger.warn('Bucket Lifecycle configuration is missing.');
     }
   }
 
