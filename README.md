@@ -20,6 +20,17 @@ The following Object Storage Server configuration properties under [`s3`](./cfg/
 - `client.endpoint`: Object Storage Server endpoint
 - `client.s3ForcePathStyle`: Whether to force path style URLs for S3 objects
 - `buckets`: list of buckets to be created on server start up
+- `bucketsLifecycleConfigs.Bucket`: name of bucket which receives the lifecycle configuration
+- `bucketsLifecycleConfigs.LifecycleConfiguration.Rules`: array containing multiple predefined rules
+- `... Rules.Status`: status of predefined rule (e.g. Enabled | Disabled )
+- `... Rules.Expiration.Date`: the date value must conform to the ISO 8601 format. The time is always midnight UTC.  (e.g. '2019-05-30T00:00:00.000Z')  
+- `... Rules.Expiration.Days`: it is the number of days since object creation when the action will occur. (e.g. 30)
+Amazon S3 calculates the time by adding the number of days specified in the rule to the object creation time and rounding the resulting time to the next day midnight UTC. For example, if an object was created at 1/15/2014 10:30 AM UTC and you specify 3 days in a transition rule, then the transition date of the object would be calculated as 1/19/2014 00:00 UTC.   
+- `... Rules.Filter.Prefix`: prefix identifying one or more objects (files or folders) to which the rule applies. (e.g. '/2019')
+- `... Rules.ID`: unique identifier for the rule. The value cannot be longer than 255 characters.
+
+Bucket Lifecycle Configurations should be handled carefully as any change to the configuration will reflect on the object storage server. 
+For example if a configuration is removed from the config, this change will also come in to effect the next time the service is started.
 
 ## gRPC Interface
 
