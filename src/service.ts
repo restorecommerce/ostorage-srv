@@ -135,170 +135,98 @@ export class Service {
       });
     }
 
-    // Create bucket lifecycle configuration as defined in config.json
+    // Bucket lifecycle configuration
+    // get a list of all the bucket names for which rules exist
+    let existingBucketRules = [];
+    // bucket names for which the existing rules should be deleted
+    let deleteBucketRules = [];
+    // bucket names for the rules in configuration
+    let updateBucketRules = [];
 
-    /*
-    Create/update/delete bucket lifecycle configurations
-    when a configuration in config.json is given.
-
-    Each bucket can have a lifecycle configuration
-    consisting of multiple predefined rules.
-
-    If we provide a configuration which matches the existing
-    buckets, then we configure that on the object storage.
-
-    If we remove a configuration for an existing bucket from config.json,
-    then we try to remove it from the object storage as-well.
-
-    If we provide a configuration in config.json for a nonexistent bucket,
-    we try to remove the configuration from the object storage in an attempt
-    to clean-up any possible previous configurations, while logging a warning
-    message showing that the config.json should be updated next time.
-
-     */
+    for (let bucket of this.buckets) {
+      await new Promise((resolve, reject) => {
+        this.ossClient.getBucketLifecycleConfiguration({ Bucket: bucket }, (err, data) => {
+          if (err) {
+            this.logger.info(`No rules are preconfigured for bucket: ${bucket}`);
+            resolve(err);
+          }
+          if (data && data.Rules) {
+            existingBucketRules.push(bucket);
+            resolve(data);
+          }
+        });
+      });
+    }
 
     // Check if lifecycle configuration is given
     if (this.bucketsLifecycleConfigs) {
-      // Read configurations
-      const configurations = this.bucketsLifecycleConfigs;
-      // Read configuration and map bucket name found in cfg to cfg object itself
-      let nameCfgMapping = new Map(); // this mapping holds the bucket names found in config.json
-      let cfgBucketNamesList: string[] = [];
-      const bucketsList = this.buckets;
-      // This input parameter is updated appropriately later
-      let bucketParam;
-      for (let cfg of configurations) {
-        nameCfgMapping.set(cfg.Bucket, cfg);
-        // Create a separate list only with the bucket names found in the configurations
-        cfgBucketNamesList.push(cfg.Bucket);
+      // check if there are any bucket rules to be removed
+      for (let bucketLifecycleConfiguration of this.bucketsLifecycleConfigs) {
+        updateBucketRules.push(bucketLifecycleConfiguration.Bucket);
       }
-      let cfgToAddMapping = new Map(); // this mapping holds which cfg should be added to obj storage
-      let cfgToRemoveMapping = new Map(); // this mapping holds which cfg should be removed from obj storage
 
-      // Step 1.
-      // Sort which configurations should be added and which should be removed
-      // based on configurations given and existing buckets
-      for (let i = 0; i < cfgBucketNamesList.length; i++) {
-        for (let j = 0; j < bucketsList.length; j++) {
-
-          // If cfg bucket name is the same as the existing bucket name
-          // then add the name to the cfgToAddMapping
-          if (cfgBucketNamesList[i] == bucketsList[j]) {
-
-            cfgToAddMapping.set(cfgBucketNamesList[i], 0);
-
-            // When adding a new element to cfgToAddMapping this means we have a match
-            // so we remove it from cfgToRemoveMapping if found already inside
-            if (cfgToRemoveMapping.has(cfgBucketNamesList[i])) {
-              cfgToRemoveMapping.delete(cfgBucketNamesList[i]);
-            }
-            break;
-          } else {
-            cfgToRemoveMapping.set(cfgBucketNamesList[i], 0);
-          }
+      for (let existingBucketRule of existingBucketRules) {
+        if (!updateBucketRules.includes(existingBucketRule)) {
+          deleteBucketRules.push(existingBucketRule);
         }
       }
 
-      // Step 2.
-      // Double check if there are any existing buckets
-      // which have no configuration provided. If so,
-      // add these to the cfgToRemoveMapping too!
-      for (let k = 0; k < bucketsList.length; k++) {
-        // If bucket doesn't have any configuration provided
-        // try to remove the pre-existing configuration!
-        if (!cfgToAddMapping.has(bucketsList[k])) {
-          cfgToRemoveMapping.set(bucketsList[k], 0);
-        }
-      }
-
-      // Step 3.
-      // Finally after sorting the configurations,
-      // execute the required operations
-
-      // 3.1
-      // Iterate over cfgToAddMapping keys and PUT the configurations
-      let lifecycleParams;
-      for (let cfgToAdd of cfgToAddMapping.keys()) {
-
-        bucketParam = {
-          Bucket: cfgToAdd
-        };
-
-        // Take configuration obj from Mapping
-        lifecycleParams = nameCfgMapping.get(cfgToAdd); // this object contains all the required params
+      // delete rules
+      for (let bucket of deleteBucketRules) {
         await new Promise((resolve, reject) => {
-          this.ossClient.putBucketLifecycleConfiguration(lifecycleParams, (err, data) => {
-            if (err) { // an error occurred
-              this.logger.error('Error occurred while adding bucket configuration for bucket:',
-                {
-                  bucket: cfgToAdd, error: err, errorStack: err.stack
-                });
-            } else { // successful response
-              this.logger.info ('Successfully added BucketLifecycleConfiguration for',
-                {
-                  bucket: cfgToAdd
-                });
-              resolve(data);
-            }
-          });
-        });
-      }
-
-      // 3.2
-      // Iterate over cfgToRemoveMapping keys and DELETE the configurations
-      for (let cfgToRemove of cfgToRemoveMapping.keys()) {
-        bucketParam = {
-          Bucket: cfgToRemove
-        };
-
-        // Try to get the Bucket's lifecycle configuration which is going to be deleted
-        await new Promise((resolve, reject) => {
-          this.ossClient.getBucketLifecycleConfiguration(bucketParam, (err, data) => {
-            if (err) { // an error occurred
-              if (err.code == 'NoSuchBucket') {
-                this.logger.warn('Configuration for bucket not found,' +
-                  ' please update config file and remove this one from it!',
-                {
-                  bucket: cfgToRemove, error: err
-                });
-              } else {
-                this.logger.error('Error occurred while retrieving bucket configuration for bucket:',
-                  {
-                    cfgToRemove, error: err, errorStack: err.stack
-                  });
-              }
-              resolve(err);
-            } else { // successful response
-              this.logger.info ('Successfully retrieved BucketLifecycleConfiguration for',
-                {
-                  bucket: cfgToRemove
-                });
-              resolve(data);
-            }
-          });
-        });
-
-        // Remove only if existent
-        await new Promise((resolve, reject) => {
-          this.ossClient.deleteBucketLifecycle(bucketParam, (err, data) => {
+          this.ossClient.deleteBucketLifecycle({Bucket: bucket}, (err, data) => {
             if (err) { // an error occurred
               this.logger.error('Error occurred while removing bucket configuration for bucket:',
                 {
-                  bucket: cfgToRemove, error: err, errorStack: err.stack
+                  Bucket: bucket, error: err, errorStack: err.stack
                 });
-              resolve(err);
+              reject(err);
+              return;
             } else { // successful response
-              this.logger.info ('Successfully removed BucketLifecycleConfiguration',
+              this.logger.info(`Successfully removed BucketLifecycleConfiguration for bucket: ${bucket}`);
+              resolve(data);
+            }
+          });
+        });
+      }
+
+      // Upsert rules
+      for (let bucketLifecycleParams of this.bucketsLifecycleConfigs) {
+        let bucketName = bucketLifecycleParams.Bucket;
+        await new Promise((resolve, reject) => {
+          this.ossClient.putBucketLifecycleConfiguration(bucketLifecycleParams, (err, data) => {
+            if (err) { // an error occurred
+              this.logger.error('Error occurred while adding bucket configuration for:',
                 {
-                  bucket: cfgToRemove
+                  bucket: bucketName, error: err, errorStack: err.stack
                 });
+            } else { // successful response
+              this.logger.info (`Successfully added BucketLifecycleConfiguration for bucket: ${bucketName}`);
               resolve(data);
             }
           });
         });
       }
     } else {
-      this.logger.warn('Bucket Lifecycle configuration is missing.');
+      // Check old rules if they exist in all the buckets and delete them.
+      // This is for use case if the configurations were added previously and all of them are removed now.
+      for (let existingBucketRule of existingBucketRules) {
+        await new Promise((resolve, reject) => {
+          this.ossClient.deleteBucketLifecycle({Bucket: existingBucketRule}, (err, data) => {
+            if (err) { // an error occurred
+              this.logger.error('Error occurred while removing bucket configuration for bucket:',
+                {
+                  existingBucketRule, error: err, errorStack: err.stack
+                });
+              reject(err);
+              return;
+            } else { // successful response
+              this.logger.info(`Successfully removed BucketLifecycleConfiguration for bucket: ${existingBucketRule}`);
+              resolve(data);
+            }
+          });
+        });
+      }
     }
   }
 
