@@ -216,7 +216,7 @@ export class Service {
             if (err) { // an error occurred
               this.logger.error('Error occurred while removing bucket configuration for bucket:',
                 {
-                  existingBucketRule, error: err, errorStack: err.stack
+                  bucket: existingBucketRule, error: err, errorStack: err.stack
                 });
               reject(err);
               return;
