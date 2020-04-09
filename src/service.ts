@@ -95,6 +95,16 @@ export class InvalidKey extends Error {
   }
 }
 
+export class InvalidFileName extends Error {
+  details: any;
+  constructor(details: any) {
+    super();
+    this.name = this.constructor.name;
+    this.message = 'Invalid file name';
+    this.details = details;
+  }
+}
+
 export class Service {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
   buckets: string[];
@@ -186,7 +196,6 @@ export class Service {
           } else {
             cfgToRemoveMapping.set(cfgBucketNamesList[i], 0);
           }
-
         }
       }
 
@@ -524,13 +533,25 @@ export class Service {
     }
   }
 
+  // Regular expression that checks if the filename string contains
+  // only characters described as safe to use in the Amazon S3
+  // Object Key Naming Guidelines
+  async isFilenameCorrect(key: string): Promise<boolean> {
+    const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()]+$');
+    return (allowedCharacters.test(key));
+  }
+
   private async storeObject(key: string, bucket: string, object: any, meta: any, options: Options): Promise<PutResponse> {
+    this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
+    if (!await this.isFilenameCorrect(key)) {
+      throw new InvalidFileName(key);
+    }
+
     try {
       let metaData = {
         meta: JSON.stringify(meta),
         key,
       };
-      this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
       const readable = new Readable();
       readable.push(object);
       readable.push(null);
