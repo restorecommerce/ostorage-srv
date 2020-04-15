@@ -19,6 +19,11 @@ export enum Operation {
   iLIKE = 'iLike'
 }
 
+export interface Attribute {
+  id: string;
+  value: string;
+}
+
 export interface Options {
   encoding?: string;
   content_type?: string;
@@ -27,6 +32,7 @@ export interface Options {
   length?: number;
   version?: string;
   md5?: string;
+  tags?: Attribute[];
 }
 
 export interface FilterType {
@@ -317,13 +323,34 @@ export class Service {
               err = new errors.NotFound('The specified key was not found');
               err.code = 404;
             }
-            this.logger.error('Error occurred retrieving metadata for key:', { key, error: err });
+            this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
             return await call.end(err);
           }
           resolve(data);
         });
       });
 
+      // get object tagging of the object stored in the S3 object storage
+      let objectTagging: any;
+      try {
+        objectTagging = await new Promise((resolve, reject) => {
+          this.ossClient.getObjectTagging(params, async (err: any, data) => {
+            if (err) {
+              // map the s3 error codes to standard chassis-srv errors
+              if (err.code === 'NotFound') {
+                err = new errors.NotFound('The specified key was not found');
+                err.code = 404;
+              }
+              this.logger.error('Error occurred while retrieving tags for key:', { Key: key, error: err });
+              return await call.end(err);
+            }
+            resolve(data);
+          });
+        });
+      } catch (err) {
+        this.logger.info('No object tagging found for key:', {Key: key});
+      }
+      console.log('this is objtagging', objectTagging);
       // capture meta data from response message
       let metaObj;
       if (headObject && headObject.Metadata && headObject.Metadata.meta) {
@@ -361,10 +388,27 @@ export class Service {
           version = headObject['x-amz-version-id'];
         }
       }
-      const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5 };
+      let tags: Attribute[] = [];
+      let tagObj: Attribute;
+      if (objectTagging) {
+        // transform received object to respect our own defined structure
+        let receivedTags = objectTagging.TagSet;
+
+        for (let i = 0; i < receivedTags.length; i++ ) {
+          tagObj = {
+            id: receivedTags[i].Key,
+            value: receivedTags[i].Value
+          };
+          tags.push(tagObj);
+        }
+      }
+
+      const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5, tags };
+
+      console.log('optionsObj', JSON.stringify(optionsObj));
 
       // write meta data and options to the gRPC call
-      await call.write({ meta: metaObj, options:optionsObj });
+      await call.write({ meta: metaObj, options: optionsObj });
       await call.end();
       return;
     }
@@ -434,10 +478,10 @@ export class Service {
             resolve(response);
           });
         });
-        key = req.key;
         bucket = req.bucket;
-        object = req.object;
+        key = req.key;
         meta = req.meta;
+        object = req.object;
         options = req.options;
         if (!_.includes(this.buckets, bucket)) {
           stream = false;
@@ -485,6 +529,26 @@ export class Service {
       readable.push(null);
       const passStream = new PassThrough();
 
+      console.log('received tags=', options.tags);
+
+      // convert array of tags to query parameters
+      // required by AWS.S3
+      let TaggingQueryParams = '';
+      let tagId: string, tagVal: string;
+      if (options && options.tags) {
+        let tags = options.tags;
+        for (let i = 0; i < tags.length; i++) {
+          tagId = tags[i].id;
+          tagVal = tags[i].value;
+          if (i < tags.length - 1) {
+            TaggingQueryParams += tagId + '=' + tagVal + '&';
+          } else {
+            TaggingQueryParams += tagId + '=' + tagVal;
+          }
+        }
+      }
+      console.log('TaggingQueryParams=',TaggingQueryParams);
+
       // write headers to the S3 object
       const uploadable = this.ossClient.upload({
         Key: key,
@@ -496,6 +560,7 @@ export class Service {
         ContentType: options && options.content_type,
         ContentLanguage: options && options.content_language,
         ContentDisposition: options && options.content_disposition,
+        Tagging: TaggingQueryParams // this param looks like 'key1=val1&key2=val2'
       }, (error, data) => { });
       readable.pipe(passStream);
 
@@ -512,7 +577,8 @@ export class Service {
       });
       if (output) {
         const url = this.host + bucket + '/' + key;
-        const ret =  { url, key, bucket, meta };
+        const tags = options && options.tags;
+        const ret =  { url, key, bucket, meta, tags };
         return ret;
       }
     } catch (err) {
