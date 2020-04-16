@@ -350,7 +350,6 @@ export class Service {
       } catch (err) {
         this.logger.info('No object tagging found for key:', {Key: key});
       }
-      console.log('this is objtagging', objectTagging);
       // capture meta data from response message
       let metaObj;
       if (headObject && headObject.Metadata && headObject.Metadata.meta) {
@@ -405,15 +404,13 @@ export class Service {
 
       const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5, tags };
 
-      console.log('optionsObj', JSON.stringify(optionsObj));
-
       // write meta data and options to the gRPC call
       await call.write({ meta: metaObj, options: optionsObj });
       await call.end();
       return;
     }
 
-    this.logger.verbose(`Received a request to get object ${key} on bucket ${bucket}`);
+    this.logger.verbose(`Received a request to get object ${ key } on bucket ${ bucket }`);
 
     // retrieve object from Amazon S3
     // and create stream from it
@@ -524,12 +521,15 @@ export class Service {
         meta: JSON.stringify(meta),
         key,
       };
+      // add stream of data into a readable stream
       const readable = new Readable();
       readable.push(object);
       readable.push(null);
+      // create writable stream in which we pipe the readable stream
       const passStream = new PassThrough();
-
-      console.log('received tags=', options.tags);
+      // get object length
+      let length: number;
+      length = readable.readableLength;
 
       // convert array of tags to query parameters
       // required by AWS.S3
@@ -547,19 +547,21 @@ export class Service {
           }
         }
       }
-      console.log('TaggingQueryParams=',TaggingQueryParams);
 
       // write headers to the S3 object
+      if (!options) {
+        options = {};
+      }
       const uploadable = this.ossClient.upload({
         Key: key,
         Bucket: bucket,
         Body: passStream,
         Metadata: metaData,
         // options:
-        ContentEncoding: options && options.encoding,
-        ContentType: options && options.content_type,
-        ContentLanguage: options && options.content_language,
-        ContentDisposition: options && options.content_disposition,
+        ContentEncoding: options.encoding,
+        ContentType: options.content_type,
+        ContentLanguage: options.content_language,
+        ContentDisposition: options.content_disposition,
         Tagging: TaggingQueryParams // this param looks like 'key1=val1&key2=val2'
       }, (error, data) => { });
       readable.pipe(passStream);
@@ -578,7 +580,7 @@ export class Service {
       if (output) {
         const url = this.host + bucket + '/' + key;
         const tags = options && options.tags;
-        const ret =  { url, key, bucket, meta, tags };
+        const ret =  { url, key, bucket, meta, tags, length };
         return ret;
       }
     } catch (err) {

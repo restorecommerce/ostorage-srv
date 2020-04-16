@@ -21,9 +21,9 @@
                 "Date": "2019-05-30T00:00:00.000Z"
               },
               "Filter": {
-                "Prefix": "/test"
+                "Prefix": "test/"
               },
-              "ID": "Delete all files(or folders) from invoices bucket which names begin with \\'test\\'"
+              "ID": "Delete all files under folder and the folder as-well"
             },
             {
               "Status": "Enabled",
@@ -31,9 +31,9 @@
                 "Date": "2019-05-30T00:00:00.000Z"
               },
               "Filter": {
-                "Prefix": "/temp"
+                "Prefix": "temp/"
               },
-              "ID": "Delete all files(or folders) from invoices which names begin with \\'temp\\'"
+              "ID": "Delete all files under folder and the folder as-well"
             }
           ]
         }
@@ -45,12 +45,15 @@
             {
               "Status": "Enabled",
               "Expiration": {
-                "Date": "2019-05-30T00:00:00.000Z"
+                "Days": 1
               },
               "Filter": {
-                "Prefix": "/test"
+                "Tag": {
+                  "Key": "id_1",
+                  "Value": "value_1"
+                }
               },
-              "ID": "Delete all files(or folders) from usercontent which names begin with \\'test\\'"
+              "ID": "Delete all files tagged with Tag { Key: id_1, Value: value_1 }"
             }
           ]
         }
