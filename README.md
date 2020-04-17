@@ -62,15 +62,19 @@ Requests are performed using `io.restorecommerce.ostorage.Object` protobuf messa
 | length | int32 | optional | ContentLength header - Content size in bytes. This parameter is useful when the content size cannot be determined automatically.|
 | version | string | optional | x-amz-version-id header - Version ID of the newly created object, in case the bucket has versioning turned on.|
 | md5 | string | optional | ETag - Entity tag that identifies the newly created object's data.|
+| tags | [ ] [io.restorecommerce.access_control.Attribute](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto) | optional | The tag-set for the object. The tag-set is used for filtering by tag.|
 
 `io.restorecommerce.ostorage.Response`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| url | string | required | url of saved Object.|
+| url | string | required | Url of saved Object.|
 | bucket | string | required | Bucket to which the object is mapped to.|
 | key | string | optional | Object Key.|
 | meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object.|
+| tags | [ ] [io.restorecommerce.access_control.Attribute](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto) | optional | The tag-set for the object. The tag-set is used for filtering by tag.|
+| length | int32 | optional | Size of uploaded object |
+
 ### `Get`
 
 Used to retrieve the Object from the Storage Server.

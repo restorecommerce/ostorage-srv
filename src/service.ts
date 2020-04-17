@@ -101,12 +101,12 @@ export class InvalidKey extends Error {
   }
 }
 
-export class InvalidFileName extends Error {
+export class IsValidObjectName extends Error {
   details: any;
   constructor(details: any) {
     super();
     this.name = this.constructor.name;
-    this.message = 'Invalid file name';
+    this.message = 'Invalid object name';
     this.details = details;
   }
 }
@@ -505,15 +505,15 @@ export class Service {
   // Regular expression that checks if the filename string contains
   // only characters described as safe to use in the Amazon S3
   // Object Key Naming Guidelines
-  async isFilenameCorrect(key: string): Promise<boolean> {
+  private isValidObjectName(key: string): boolean {
     const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()]+$');
     return (allowedCharacters.test(key));
   }
 
   private async storeObject(key: string, bucket: string, object: any, meta: any, options: Options): Promise<PutResponse> {
     this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
-    if (!await this.isFilenameCorrect(key)) {
-      throw new InvalidFileName(key);
+    if (!this.isValidObjectName(key)) {
+      throw new IsValidObjectName(key);
     }
 
     try {
@@ -534,20 +534,19 @@ export class Service {
       // convert array of tags to query parameters
       // required by AWS.S3
       let TaggingQueryParams = '';
-      let tagId: string, tagVal: string;
+      let tagId: string, tagVal: string; let tagIndex: number;
       if (options && options.tags) {
         let tags = options.tags;
-        for (let i = 0; i < tags.length; i++) {
-          tagId = tags[i].id;
-          tagVal = tags[i].value;
-          if (i < tags.length - 1) {
+        for (const [i, v] of tags.entries()) {
+          tagId = v.id;
+          tagVal = v.value;
+          if(i < tags.length - 1) {
             TaggingQueryParams += tagId + '=' + tagVal + '&';
           } else {
             TaggingQueryParams += tagId + '=' + tagVal;
           }
         }
       }
-
       // write headers to the S3 object
       if (!options) {
         options = {};
