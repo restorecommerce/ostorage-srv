@@ -506,7 +506,7 @@ export class Service {
   // only characters described as safe to use in the Amazon S3
   // Object Key Naming Guidelines
   private isValidObjectName(key: string): boolean {
-    const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()]+$');
+    const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()/]+$');
     return (allowedCharacters.test(key));
   }
 
