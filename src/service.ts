@@ -19,6 +19,11 @@ export enum Operation {
   iLIKE = 'iLike'
 }
 
+export interface Attribute {
+  id: string;
+  value: string;
+}
+
 export interface Options {
   encoding?: string;
   content_type?: string;
@@ -27,6 +32,7 @@ export interface Options {
   length?: number;
   version?: string;
   md5?: string;
+  tags?: Attribute[];
 }
 
 export interface FilterType {
@@ -95,17 +101,31 @@ export class InvalidKey extends Error {
   }
 }
 
+export class IsValidObjectName extends Error {
+  details: any;
+  constructor(details: any) {
+    super();
+    this.name = this.constructor.name;
+    this.message = 'Invalid object name';
+    this.details = details;
+  }
+}
+
 export class Service {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
   buckets: string[];
   host: String;
+  bucketsLifecycleConfigs?: any;
+
   constructor(cfg: any, private logger: any) {
     this.ossClient = new aws.S3(cfg.s3.client);
     this.host = cfg.host.endpoint;
     this.buckets = cfg.s3.buckets || [];
+    this.bucketsLifecycleConfigs = cfg.s3.bucketsLifecycleConfigs;
   }
 
   async start(): Promise<void> {
+    // Create buckets as defined in config.json
     for (let bucket of this.buckets) {
       await new Promise((resolve, reject) => {
         this.ossClient.createBucket({
@@ -119,6 +139,100 @@ export class Service {
           resolve(data);
         });
       });
+    }
+
+    // Bucket lifecycle configuration
+    // get a list of all the bucket names for which rules exist
+    let existingBucketRules = [];
+    // bucket names for which the existing rules should be deleted
+    let deleteBucketRules = [];
+    // bucket names for the rules in configuration
+    let updateBucketRules = [];
+
+    for (let bucket of this.buckets) {
+      await new Promise((resolve, reject) => {
+        this.ossClient.getBucketLifecycleConfiguration({ Bucket: bucket }, (err, data) => {
+          if (err) {
+            this.logger.info(`No rules are preconfigured for bucket: ${bucket}`);
+            resolve(err);
+          }
+          if (data && data.Rules) {
+            existingBucketRules.push(bucket);
+            resolve(data);
+          }
+        });
+      });
+    }
+
+    // Check if lifecycle configuration is given
+    if (this.bucketsLifecycleConfigs) {
+      // check if there are any bucket rules to be removed
+      for (let bucketLifecycleConfiguration of this.bucketsLifecycleConfigs) {
+        updateBucketRules.push(bucketLifecycleConfiguration.Bucket);
+      }
+
+      for (let existingBucketRule of existingBucketRules) {
+        if (!updateBucketRules.includes(existingBucketRule)) {
+          deleteBucketRules.push(existingBucketRule);
+        }
+      }
+
+      // delete rules
+      for (let bucket of deleteBucketRules) {
+        await new Promise((resolve, reject) => {
+          this.ossClient.deleteBucketLifecycle({Bucket: bucket}, (err, data) => {
+            if (err) { // an error occurred
+              this.logger.error('Error occurred while removing bucket configuration for bucket:',
+                {
+                  Bucket: bucket, error: err, errorStack: err.stack
+                });
+              reject(err);
+              return;
+            } else { // successful response
+              this.logger.info(`Successfully removed BucketLifecycleConfiguration for bucket: ${bucket}`);
+              resolve(data);
+            }
+          });
+        });
+      }
+
+      // Upsert rules
+      for (let bucketLifecycleParams of this.bucketsLifecycleConfigs) {
+        let bucketName = bucketLifecycleParams.Bucket;
+        await new Promise((resolve, reject) => {
+          this.ossClient.putBucketLifecycleConfiguration(bucketLifecycleParams, (err, data) => {
+            if (err) { // an error occurred
+              this.logger.error('Error occurred while adding bucket configuration for:',
+                {
+                  bucket: bucketName, error: err, errorStack: err.stack
+                });
+            } else { // successful response
+              this.logger.info (`Successfully added BucketLifecycleConfiguration for bucket: ${bucketName}`);
+              resolve(data);
+            }
+          });
+        });
+      }
+    } else {
+      // Check old rules if they exist in all the buckets and delete them.
+      // This is for use case if the configurations were added previously and all of them are removed now.
+      for (let existingBucketRule of existingBucketRules) {
+        await new Promise((resolve, reject) => {
+          this.ossClient.deleteBucketLifecycle({Bucket: existingBucketRule}, (err, data) => {
+            if (err) { // an error occurred
+              this.logger.error('Error occurred while removing bucket configuration for bucket:',
+                {
+                  bucket: existingBucketRule, error: err, errorStack: err.stack
+                });
+              reject(err);
+              return;
+            } else { // successful response
+              this.logger.info(`Successfully removed BucketLifecycleConfiguration for bucket: ${existingBucketRule}`);
+              resolve(data);
+            }
+          });
+        });
+      }
     }
   }
 
@@ -209,13 +323,33 @@ export class Service {
               err = new errors.NotFound('The specified key was not found');
               err.code = 404;
             }
-            this.logger.error('Error occurred retrieving metadata for key:', { key, error: err });
+            this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
             return await call.end(err);
           }
           resolve(data);
         });
       });
 
+      // get object tagging of the object stored in the S3 object storage
+      let objectTagging: any;
+      try {
+        objectTagging = await new Promise((resolve, reject) => {
+          this.ossClient.getObjectTagging(params, async (err: any, data) => {
+            if (err) {
+              // map the s3 error codes to standard chassis-srv errors
+              if (err.code === 'NotFound') {
+                err = new errors.NotFound('The specified key was not found');
+                err.code = 404;
+              }
+              this.logger.error('Error occurred while retrieving tags for key:', { Key: key, error: err });
+              return await call.end(err);
+            }
+            resolve(data);
+          });
+        });
+      } catch (err) {
+        this.logger.info('No object tagging found for key:', {Key: key});
+      }
       // capture meta data from response message
       let metaObj;
       if (headObject && headObject.Metadata && headObject.Metadata.meta) {
@@ -253,15 +387,30 @@ export class Service {
           version = headObject['x-amz-version-id'];
         }
       }
-      const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5 };
+      let tags: Attribute[] = [];
+      let tagObj: Attribute;
+      if (objectTagging) {
+        // transform received object to respect our own defined structure
+        let receivedTags = objectTagging.TagSet;
+
+        for (let i = 0; i < receivedTags.length; i++ ) {
+          tagObj = {
+            id: receivedTags[i].Key,
+            value: receivedTags[i].Value
+          };
+          tags.push(tagObj);
+        }
+      }
+
+      const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5, tags };
 
       // write meta data and options to the gRPC call
-      await call.write({ meta: metaObj, options:optionsObj });
+      await call.write({ meta: metaObj, options: optionsObj });
       await call.end();
       return;
     }
 
-    this.logger.verbose(`Received a request to get object ${key} on bucket ${bucket}`);
+    this.logger.verbose(`Received a request to get object ${ key } on bucket ${ bucket }`);
 
     // retrieve object from Amazon S3
     // and create stream from it
@@ -326,10 +475,10 @@ export class Service {
             resolve(response);
           });
         });
-        key = req.key;
         bucket = req.bucket;
-        object = req.object;
+        key = req.key;
         meta = req.meta;
+        object = req.object;
         options = req.options;
         if (!_.includes(this.buckets, bucket)) {
           stream = false;
@@ -353,29 +502,66 @@ export class Service {
     }
   }
 
+  // Regular expression that checks if the filename string contains
+  // only characters described as safe to use in the Amazon S3
+  // Object Key Naming Guidelines
+  private isValidObjectName(key: string): boolean {
+    const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()/]+$');
+    return (allowedCharacters.test(key));
+  }
+
   private async storeObject(key: string, bucket: string, object: any, meta: any, options: Options): Promise<PutResponse> {
+    this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
+    if (!this.isValidObjectName(key)) {
+      throw new IsValidObjectName(key);
+    }
+
     try {
       let metaData = {
         meta: JSON.stringify(meta),
         key,
       };
-      this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
+      // add stream of data into a readable stream
       const readable = new Readable();
       readable.push(object);
       readable.push(null);
+      // create writable stream in which we pipe the readable stream
       const passStream = new PassThrough();
+      // get object length
+      let length: number;
+      length = readable.readableLength;
 
+      // convert array of tags to query parameters
+      // required by AWS.S3
+      let TaggingQueryParams = '';
+      let tagId: string, tagVal: string; let tagIndex: number;
+      if (options && options.tags) {
+        let tags = options.tags;
+        for (const [i, v] of tags.entries()) {
+          tagId = v.id;
+          tagVal = v.value;
+          if(i < tags.length - 1) {
+            TaggingQueryParams += tagId + '=' + tagVal + '&';
+          } else {
+            TaggingQueryParams += tagId + '=' + tagVal;
+          }
+        }
+      }
       // write headers to the S3 object
+      if (!options) {
+        options = {};
+      }
       const uploadable = this.ossClient.upload({
         Key: key,
         Bucket: bucket,
         Body: passStream,
         Metadata: metaData,
         // options:
-        ContentEncoding: options && options.encoding,
-        ContentType: options && options.content_type,
-        ContentLanguage: options && options.content_language,
-        ContentDisposition: options && options.content_disposition,
+        ContentEncoding: options.encoding,
+        ContentType: options.content_type,
+        ContentLanguage: options.content_language,
+        ContentDisposition: options.content_disposition,
+        Tagging: TaggingQueryParams // this param looks like 'key1=val1&key2=val2'
       }, (error, data) => { });
       readable.pipe(passStream);
 
@@ -392,7 +578,8 @@ export class Service {
       });
       if (output) {
         const url = this.host + bucket + '/' + key;
-        const ret =  { url, key, bucket, meta };
+        const tags = options && options.tags;
+        const ret =  { url, key, bucket, meta, tags, length };
         return ret;
       }
     } catch (err) {

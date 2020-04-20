@@ -20,6 +20,18 @@ The following Object Storage Server configuration properties under [`s3`](./cfg/
 - `client.endpoint`: Object Storage Server endpoint
 - `client.s3ForcePathStyle`: Whether to force path style URLs for S3 objects
 - `buckets`: list of buckets to be created on server start up
+- `bucketsLifecycleConfigs.Bucket`: name of bucket which receives the lifecycle configuration
+- `bucketsLifecycleConfigs.LifecycleConfiguration.Rules`: array containing multiple predefined rules
+- [`Rules.Status`](./cfg/config.json#L19): status of predefined rule (e.g. Enabled | Disabled )
+- [`Rules.Expiration.Date`](./cfg/config.json#L21): the date when the expiration will occur. The value must conform to the ISO 8601 format. The time is always midnight UTC.  (e.g. '2019-05-30T00:00:00.000Z')  
+- [`Rules.Expiration.Days`](./cfg/config.json#L38): the number of days since object creation when the expiration will occur. (e.g. 30)
+Amazon S3 calculates the time by adding the number of days specified in the rule to the object creation time and rounding the resulting time to the next day midnight UTC. For example, if an object was created at 1/15/2014 10:30 AM UTC and you specify 3 days in a transition rule, then the transition date of the object would be calculated as 1/19/2014 00:00 UTC.   
+- [`Rules.Filter.Prefix`](./cfg/config.json#L24): filtering based on prefix identifying one or more objects (files or folders) to which the rule applies. (e.g. 'temp/' expires all objects under 'temp' folder)
+- [`Rules.Filter.Tag`](./cfg/config.json#L41): filtering based on Tag which is identifying one or more objects to which the rule applies. (e.g. 'Tag { Key: 'id_1', Value: 'value_1' }' expires all objects tagged with the respective key-value pair)
+- [`Rules.ID`](./cfg/config.json#L26): unique identifier for the rule. The value cannot be longer than 255 characters.
+
+Bucket Lifecycle Configurations should be handled carefully as any change to the configuration will reflect on the object storage server. 
+For example if a configuration is removed from the config, this change will also come in to effect the next time the service is started.
 
 ## gRPC Interface
 
@@ -51,15 +63,19 @@ Requests are performed using `io.restorecommerce.ostorage.Object` protobuf messa
 | length | int32 | optional | ContentLength header - Content size in bytes. This parameter is useful when the content size cannot be determined automatically.|
 | version | string | optional | x-amz-version-id header - Version ID of the newly created object, in case the bucket has versioning turned on.|
 | md5 | string | optional | ETag - Entity tag that identifies the newly created object's data.|
+| tags | [ ] [io.restorecommerce.access_control.Attribute](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto) | optional | The tag-set for the object. The tag-set is used for filtering by tag.|
 
 `io.restorecommerce.ostorage.Response`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| url | string | required | url of saved Object.|
+| url | string | required | Url of saved Object.|
 | bucket | string | required | Bucket to which the object is mapped to.|
 | key | string | optional | Object Key.|
 | meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object.|
+| tags | [ ] [io.restorecommerce.access_control.Attribute](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto) | optional | The tag-set for the object. The tag-set is used for filtering by tag.|
+| length | int32 | optional | Size of uploaded object |
+
 ### `Get`
 
 Used to retrieve the Object from the Storage Server.
