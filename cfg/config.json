@@ -21,16 +21,6 @@
                 "Date": "2019-05-30T00:00:00.000Z"
               },
               "Filter": {
-                "Prefix": "test/"
-              },
-              "ID": "Delete all files under folder and the folder as-well"
-            },
-            {
-              "Status": "Enabled",
-              "Expiration": {
-                "Date": "2019-05-30T00:00:00.000Z"
-              },
-              "Filter": {
                 "Prefix": "temp/"
               },
               "ID": "Delete all files under folder and the folder as-well"
