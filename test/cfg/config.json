@@ -11,7 +11,55 @@
     },
     "buckets": [
       "test"
-     ]
+     ],
+    "bucketsLifecycleConfigs" :[],
+    "testCfg": [
+      {
+        "cfg_1":[
+          {
+            "Bucket": "test",
+            "LifecycleConfiguration": {
+              "Rules": [
+                {
+                  "Status": "Enabled",
+                  "Expiration": {
+                    "Date": "2019-05-30T00:00:00.000Z"
+                  },
+                  "Filter": {
+                    "Prefix": "temp/"
+                  },
+                  "ID": "Delete all files under folder and the folder as-well"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "cfg_2": [
+          {
+            "Bucket": "usercontent",
+            "LifecycleConfiguration": {
+              "Rules": [
+                {
+                  "Status": "Enabled",
+                  "Expiration": {
+                    "Days": 1
+                  },
+                  "Filter": {
+                    "Tag": {
+                      "Key": "id_1",
+                      "Value": "value_1"
+                    }
+                  },
+                  "ID": "Delete all files tagged with Tag { Key: id_1, Value: value_1 }"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   },
   "logger": {
     "console": {
@@ -65,6 +113,13 @@
       "clientId": "restore-ostorage-srv",
       "kafkaHost": "localhost:29092",
       "latestOffset": false,
+      "updateConfig": {
+        "protos": [
+          "test.proto"
+        ],
+        "protoRoot": "test/protos/",
+        "messageObject": "io.restorecommerce.ostoragetest.BucketLifecycleCfg"
+      },
       "restoreCommand": {
         "protos": [
           "io/restorecommerce/commandinterface.proto"
