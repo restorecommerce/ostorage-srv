@@ -94,12 +94,12 @@ describe('testing ostorage-srv with bucket lifecycle configuration', () => {
   let topic: Topic;
 
   beforeEach(async function start(): Promise<void> {
-    console.log('beforeEach runs');
+    console.log('beforeEach runs----------------');
 
     cfg = sconfig(process.cwd() + '/test');
     logger = new Logger(cfg.get('logger'));
 
-    updateBucketConfigs(cfg);
+    updateBucketConfigs('print this pls');
     worker = new Worker(cfg);
     await worker.start();
 
@@ -109,18 +109,19 @@ describe('testing ostorage-srv with bucket lifecycle configuration', () => {
     await worker.stop();
   });
 
-  describe('with test response listener', () => {
+  describe('with cfg 1', () => {
     before(async function start(): Promise<void> {
-      console.log('before runs');
-      events = new Events(cfg.get('events:kafka'), logger);
-      await events.start();
-      topic = events.topic('io.restorecommerce.ostoragetest');
-      topic.on('BucketLifecycleCfg', listener);
+      console.log ('start------');
+      const someFunc = (insertText: string): void => {
+        console.log('inserted Text=', insertText)
+      };
+      updateBucketConfigs = someFunc;
     });
     after(async function stop(): Promise<void> {
-      await events.stop();
+      console.log ('stop------');
     });
     it('should write configuration 1', async () => {
+      console.log('it runs--------------');
       let cfg: any[] = [];
       let cfg_1 =
         {
@@ -142,13 +143,18 @@ describe('testing ostorage-srv with bucket lifecycle configuration', () => {
         };
       cfg.push(cfg_1);
 
-      updateBucketConfigs = (cfg) => {
-        // TODO depending on your test case 
-        // you can remove or add bucketlfeConfigs here
+      const someFunc = (insertText: string): void => {
+        console.log('inserted Text=', insertText)
       };
-      const offset = await topic.$offset(-1) + 1;
-      await topic.emit('BucketLifecycleCfg', cfg);
-      await topic.$wait(offset);
+
+      updateBucketConfigs = 'value A'
+      // updateBucketConfigs = (cfg) => {
+      //   // TODO depending on your test case
+      //   // you can remove or add bucketlifeConfigs here
+      //   let someVar = cfg;
+      //   console.log(cfg);
+      // };
+
     });
 
   })
