@@ -93,7 +93,7 @@ describe('testing ostorage-srv with bucket lifecycle configuration', () => {
   let response: Array<any>;
   let topic: Topic;
 
-  before(async function start(): Promise<void> {
+  beforeEach(async function start(): Promise<void> {
     console.log('beforeEach runs');
 
     cfg = sconfig(process.cwd() + '/test');
@@ -105,7 +105,7 @@ describe('testing ostorage-srv with bucket lifecycle configuration', () => {
 
   });
 
-  after(async function stop(): Promise<void> {
+  afterEach(async function stop(): Promise<void> {
     await worker.stop();
   });
 
