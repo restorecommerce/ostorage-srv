@@ -97,9 +97,13 @@ describe('testing ostorage-srv with bucket lifecycle configuration', () => {
     console.log('beforeEach runs----------------');
 
     cfg = sconfig(process.cwd() + '/test');
-    logger = new Logger(cfg.get('logger'));
+    // set log level to silly
 
-    updateBucketConfigs('print this pls');
+    logger = new Logger(cfg.get('logger-silly'));
+    if (updateBucketConfigs) {
+      updateBucketConfigs(cfg.get());
+    }
+
     worker = new Worker(cfg);
     await worker.start();
 
@@ -109,55 +113,56 @@ describe('testing ostorage-srv with bucket lifecycle configuration', () => {
     await worker.stop();
   });
 
-  describe('with cfg 1', () => {
-    before(async function start(): Promise<void> {
-      console.log ('start------');
-      const someFunc = (insertText: string): void => {
-        console.log('inserted Text=', insertText)
-      };
-      updateBucketConfigs = someFunc;
-    });
-    after(async function stop(): Promise<void> {
-      console.log ('stop------');
-    });
-    it('should write configuration 1', async () => {
+  describe('with existing blc configuration', () => {
+    it('should create a configuration for the existing bucket', async () => {
       console.log('it runs--------------');
-      let cfg: any[] = [];
-      let cfg_1 =
-        {
-          "Bucket": "test",
-          "LifecycleConfiguration": {
-            "Rules": [
-              {
-                "Status": "Enabled",
-                "Expiration": {
-                  "Date": "2019-05-30T00:00:00.000Z"
-                },
-                "Filter": {
-                  "Prefix": "temp/"
-                },
-                "ID": "Delete all files under folder and the folder as-well"
-              }
-            ]
-          }
-        };
-      cfg.push(cfg_1);
-
-      const someFunc = (insertText: string): void => {
-        console.log('inserted Text=', insertText)
-      };
-
-      updateBucketConfigs = 'value A'
-      // updateBucketConfigs = (cfg) => {
-      //   // TODO depending on your test case
-      //   // you can remove or add bucketlifeConfigs here
-      //   let someVar = cfg;
-      //   console.log(cfg);
-      // };
-
+      // should do things
     });
 
-  })
+  });
+
+  // describe('with cfg 1', () => {
+  //   before(async function start(): Promise<void> {
+  //     console.log ('start------');
+  //     const updateCfgFunc = (cfg: any): void => {
+  //       // take s3 cfg and update it
+  //       let s3Cfg = cfg;
+  //       let bucketsLifecycleConfigs = cfg.bucketsLifecycleConfigs;
+  //       // define new cfg here here
+  //       let cfg_1 =
+  //         {
+  //           "Bucket": "test",
+  //           "LifecycleConfiguration": {
+  //             "Rules": [
+  //               {
+  //                 "Status": "Enabled",
+  //                 "Expiration": {
+  //                   "Date": "2019-05-30T00:00:00.000Z"
+  //                 },
+  //                 "Filter": {
+  //                   "Prefix": "temp/"
+  //                 },
+  //                 "ID": "Delete all files under folder and the folder as-well"
+  //               }
+  //             ]
+  //           }
+  //         };
+  //
+  //
+  //       console.log('inserted Text=', JSON.stringify(cfg));
+  //     };
+  //     updateBucketConfigs = updateCfgFunc;
+  //   });
+  //   after(async function stop(): Promise<void> {
+  //     console.log ('stop------');
+  //   });
+  //   it('should write configuration 1', async () => {
+  //     console.log('it runs--------------');
+  //     // should do things
+  //
+  //   });
+  //
+  // })
 });
 
 
