@@ -103,7 +103,8 @@ describe('testing ostorage-srv with bucket lifecycle configuration', () => {
     if (updateBucketConfigs) {
       updateBucketConfigs(cfg.get());
     }
-
+    console.log('cfg=', cfg);
+    console.log('cfg.get=', cfg.get());
     worker = new Worker(cfg);
     await worker.start();
 

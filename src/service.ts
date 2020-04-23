@@ -153,12 +153,25 @@ export class Service {
       await new Promise((resolve, reject) => {
         this.ossClient.getBucketLifecycleConfiguration({ Bucket: bucket }, (err, data) => {
           if (err) {
-            this.logger.info(`No rules are preconfigured for bucket: ${bucket}`);
-            resolve(err);
+            if (err.code == 'NoSuchLifecycleConfiguration') {
+              this.logger.info(`No rules are preconfigured for bucket: ${bucket}`);
+              resolve(err);
+            } else {
+              this.logger.error('Error occurred while retrieving lifecycle configuration for bucket:',
+                {
+                  Bucket: bucket, error: err, errorStack: err.stack
+                });
+              reject(err);
+            }
           }
-          if (data && data.Rules) {
-            existingBucketRules.push(bucket);
-            resolve(data);
+          if (data) {
+            if (data.Rules) {
+              existingBucketRules.push(bucket);
+              resolve(data);
+            } else {
+              this.logger.error('No rules found or unexpected result from the server');
+              reject(data);
+            }
           }
         });
       });
@@ -182,7 +195,7 @@ export class Service {
         await new Promise((resolve, reject) => {
           this.ossClient.deleteBucketLifecycle({Bucket: bucket}, (err, data) => {
             if (err) { // an error occurred
-              this.logger.error('Error occurred while removing bucket configuration for bucket:',
+              this.logger.error('Error occurred while removing BucketLifecycleConfiguration for bucket:',
                 {
                   Bucket: bucket, error: err, errorStack: err.stack
                 });
@@ -202,7 +215,7 @@ export class Service {
         await new Promise((resolve, reject) => {
           this.ossClient.putBucketLifecycleConfiguration(bucketLifecycleParams, (err, data) => {
             if (err) { // an error occurred
-              this.logger.error('Error occurred while adding bucket configuration for:',
+              this.logger.error('Error occurred while adding BucketLifecycleConfiguration for:',
                 {
                   bucket: bucketName, error: err, errorStack: err.stack
                 });
@@ -220,7 +233,7 @@ export class Service {
         await new Promise((resolve, reject) => {
           this.ossClient.deleteBucketLifecycle({Bucket: existingBucketRule}, (err, data) => {
             if (err) { // an error occurred
-              this.logger.error('Error occurred while removing bucket configuration for bucket:',
+              this.logger.error('Error occurred while removing BucketLifecycleConfiguration for bucket:',
                 {
                   bucket: existingBucketRule, error: err, errorStack: err.stack
                 });
