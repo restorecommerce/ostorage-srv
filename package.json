@@ -23,7 +23,6 @@
     "@restorecommerce/kafka-client": "^0.1.8",
     "@restorecommerce/logger": "^0.1.16",
     "@restorecommerce/protos": "^0.0.5",
-    "@restorecommerce/logger": "^0.1.16",
     "@restorecommerce/resource-base-interface": "^0.0.1",
     "@restorecommerce/service-config": "^0.1.6",
     "aws-sdk": "^2.656.0",
