@@ -168,10 +168,10 @@ export class Service {
             if (data.Rules) {
               existingBucketRules.push(bucket);
               resolve(data);
-            } else {
-              this.logger.error('No rules found or unexpected result from the server');
-              reject(data);
             }
+          } else {
+            this.logger.error(`Error occurred when trying to get bucket lifecycle configuration for bucket: ${bucket}`);
+            reject(data);
           }
         });
       });
