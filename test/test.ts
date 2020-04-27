@@ -218,7 +218,7 @@ describe('testing ostorage-srv', () => {
       should.exist(result);
       should.exist(result.data);
       should.exist(result.data.object_data);
-      should(result.data.object_data).length(2);
+      should(result.data.object_data).length(1);
       sleep.sleep(3);
     });
     it('should throw an error for invalid bucket request', async () => {
