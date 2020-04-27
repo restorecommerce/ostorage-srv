@@ -85,7 +85,7 @@ describe('testing ostorage-srv', () => {
       let result = await oStorage.list();
       should(result.data.file_information).empty;
     });
-    it('Should store the data to storage server using request streaming', async () => {
+    it('Should store data to storage server using request streaming', async () => {
       let response;
       // create streaming client request
       const clientConfig = cfg.get('grpc-client:service-ostorage');
