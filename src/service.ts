@@ -166,12 +166,17 @@ export class Service {
           }
           if (data) {
             if (data.Rules) {
+              // rules are found, adding them to the list
               existingBucketRules.push(bucket);
+              resolve(data);
+            } else {
+              // no rules found but there is data, means there is no configuration added for existing bucket
               resolve(data);
             }
           } else {
+            // no data found
             this.logger.error(`Error occurred when trying to get bucket lifecycle configuration for bucket: ${bucket}`);
-            reject(data);
+            throw new Error(`Error occurred when trying to get bucket lifecycle configuration for bucket: ${bucket}`);
           }
         });
       });
