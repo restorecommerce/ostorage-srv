@@ -101,7 +101,7 @@ export class InvalidKey extends Error {
   }
 }
 
-export class IsValidObjectName extends Error {
+export class InvalidObjectName extends Error {
   details: any;
   constructor(details: any) {
     super();
@@ -526,7 +526,7 @@ export class Service {
   private async storeObject(key: string, bucket: string, object: any, meta: any, options: Options): Promise<PutResponse> {
     this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
     if (!this.isValidObjectName(key)) {
-      throw new IsValidObjectName(key);
+      throw new InvalidObjectName(key);
     }
 
     try {
