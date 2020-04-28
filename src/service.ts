@@ -201,7 +201,6 @@ export class Service {
                   Bucket: bucket, error: err, errorStack: err.stack
                 });
               reject(err);
-              return;
             } else { // successful response
               this.logger.info(`Successfully removed BucketLifecycleConfiguration for bucket: ${bucket}`);
               resolve(data);
@@ -239,7 +238,6 @@ export class Service {
                   bucket: existingBucketRule, error: err, errorStack: err.stack
                 });
               reject(err);
-              return;
             } else { // successful response
               this.logger.info(`Successfully removed BucketLifecycleConfiguration for bucket: ${existingBucketRule}`);
               resolve(data);
