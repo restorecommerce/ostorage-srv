@@ -114,12 +114,10 @@ export class IsValidObjectName extends Error {
 export class Service {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
   buckets: string[];
-  host: String;
   bucketsLifecycleConfigs?: any;
 
   constructor(cfg: any, private logger: any) {
     this.ossClient = new aws.S3(cfg.s3.client);
-    this.host = cfg.host.endpoint;
     this.buckets = cfg.s3.buckets || [];
     this.bucketsLifecycleConfigs = cfg.s3.bucketsLifecycleConfigs;
   }
@@ -277,7 +275,7 @@ export class Service {
                 resolve(data.Metadata);
               });
             });
-            const url = this.host + value + '/' + meta.key;
+            const url = `//${value}/${meta.key}`;
             const objectName = meta.key;
             let objectMeta;
             if (meta && meta.meta) {
@@ -421,10 +419,10 @@ export class Service {
     await new Promise<any>((resolve, reject) => {
       downloadable
         .on('httpData', async (chunk) => {
-          await call.write({ bucket, key, object: chunk, url: this.host + bucket + '/' + key });
+          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}` });
         })
         .on('data', async (chunk) => {
-          await call.write({ bucket, key, object: chunk, url: this.host + bucket + '/' + key });
+          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}` });
         })
         .on('httpDone', async () => {
           resolve();
@@ -577,7 +575,7 @@ export class Service {
           .send();
       });
       if (output) {
-        const url = this.host + bucket + '/' + key;
+        const url = `//${bucket}/${key}`;
         const tags = options && options.tags;
         const ret =  { url, key, bucket, meta, tags, length };
         return ret;

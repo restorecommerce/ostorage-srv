@@ -6,8 +6,5 @@
       "colorize": true,
       "prettyPrint": true
     }
-  },
-  "host": {
-    "endpoint": "http://localhost:5000/"
   }
 }

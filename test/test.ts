@@ -112,7 +112,7 @@ describe('testing ostorage-srv', () => {
       should.exist(response.url);
       response.key.should.equal('config.json');
       response.bucket.should.equal('test');
-      response.url.should.equal('http://localhost:5000/test/config.json');
+      response.url.should.equal('//test/config.json');
       sleep.sleep(3);
     });
     it('should get metadata of the Object', async () => {

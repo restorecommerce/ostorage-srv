@@ -11,9 +11,6 @@
   "redis": {
     "host": "redis"
   },
-  "host": {
-    "endpoint": "https://localhost/"
-  },
   "s3": {
     "client": {
       "accessKeyId": "accessKey",
