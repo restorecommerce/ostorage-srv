@@ -50,7 +50,7 @@ The value cannot be longer than 255 characters.
 This microservice exposes the following gRPC endpoints:
 
 [#api_ostorage_put]
-=== Put
+=== `Put`
 
 Used to store the Object to the Storage Server.
 Requests are performed using `io.restorecommerce.ostorage.Object` protobuf message as input and response
@@ -61,12 +61,11 @@ is `io.restorecommerce.ostorage.Response` message.
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |==============================================================================================================================================
 | Field | Type | Label | Description
-| bucket | string | required | Bucket to which the object should be mapped to
-| object | bytes | required | Blob
-| key | string | required | Object Key
-| meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object
-| url | string| optional | URL
-| options | [io.restorecommerce.ostorage.Options](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto) | optional | headers attached to Object
+| bucket | string | required | Bucket to which the object should be mapped to.
+| object | bytes | required | Blob.
+| key | string | required | Object Key.
+| meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | metadata attached to Object.
+| options | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.ostorage.Options`] | optional | headers attached to Object.
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.Options`
@@ -81,7 +80,7 @@ is `io.restorecommerce.ostorage.Response` message.
 | length | int32 | optional | ContentLength header - Content size in bytes. This parameter is useful when the content size cannot be determined automatically
 | version | string | optional | x-amz-version-id header - Version ID of the newly created object, in case the bucket has versioning turned on
 | md5 | string | optional | ETag - Entity tag that identifies the newly created object's data
-| tags | [ ] [io.restorecommerce.access_control.Attribute](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto) | optional | The tag-set for the object. The tag-set is used for filtering by tag
+| tags | [ ] https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto[`io.restorecommerce.access_control.Attribute`] | optional | The tag-set for the object. The tag-set is used for filtering by tag
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.Response`
@@ -92,13 +91,13 @@ is `io.restorecommerce.ostorage.Response` message.
 | url | string | required | Url of saved Object
 | bucket | string | required | Bucket to which the object is mapped to
 | key | string | optional | Object Key
-| meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object
-| tags | [ ] [io.restorecommerce.access_control.Attribute](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto) | optional | The tag-set for the object. The tag-set is used for filtering by tag
+| meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | metadata attached to Object
+| tags | [ ] https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto[`io.restorecommerce.access_control.Attribute`] | optional | The tag-set for the object. The tag-set is used for filtering by tag
 | length | int32 | optional | Size of uploaded object
 |==============================================================================================================================================
 
 [#api_ostorage_get]
-=== Get
+=== `Get`
 
 Used to retrieve the Object from the Storage Server.
 Requests are performed using `io.restorecommerce.ostorage.GetRequest` protobuf message as input and response is `io.restorecommerce.ostorage.Object` message.
@@ -115,7 +114,7 @@ Requests are performed using `io.restorecommerce.ostorage.GetRequest` protobuf m
 |==============================================================================================================================================
 
 [#api_ostorage_list]
-=== List
+=== `List`
 
 Used to list all the Objects in a Bucket from the Storage Server.
 Requests are performed using `io.restorecommerce.ostorage.ListRequest` protobuf message as input and response is `io.restorecommerce.ostorage.ObjectsData` message.
@@ -144,11 +143,11 @@ Requests are performed using `io.restorecommerce.ostorage.ListRequest` protobuf 
 | Field | Type | Label | Description
 | url | string | required | url for Object
 | object_name | string | required | Object name
-| meta | [io.restorecommerce.meta.Meta](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | optional | metadata attached to Object
+| meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | metadata attached to Object
 |==============================================================================================================================================
 
 [#api_ostorage_delete]
-=== Delete
+=== `Delete`
 
 Used to delete the Object mapped to the Bucket from the Storage Server.
 Requests are performed using `io.restorecommerce.ostorage.Bucket` protobuf message as input and response is `google.protobuf.Empty` message.
