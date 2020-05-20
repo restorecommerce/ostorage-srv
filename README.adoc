@@ -18,15 +18,15 @@ A microservice for object storage.
 
 The following Object Storage Server configuration properties under the link:cfg/config.json[`s3`] configuration are available:
 
-- `client.accessKeyId`: access key ID for Object Storage Server
-- `client.secretAccessKey`: secret access key for Object Storage Server
-- `client.endpoint`: Object Storage Server endpoint
-- `client.s3ForcePathStyle`: Whether to force path style URLs for S3 objects
-- `buckets`: list of buckets to be created on server start up
-- `bucketsLifecycleConfigs.Bucket`: name of bucket which receives the lifecycle configuration
-- `bucketsLifecycleConfigs.LifecycleConfiguration.Rules`: array containing multiple predefined rules
+- `client.accessKeyId`: access key ID for Object Storage Server.
+- `client.secretAccessKey`: secret access key for Object Storage Server.
+- `client.endpoint`: Object Storage Server endpoint.
+- `client.s3ForcePathStyle`: Whether to force path style URLs for S3 objects.
+- `buckets`: list of buckets to be created on server start up.
+- `bucketsLifecycleConfigs.Bucket`: name of bucket which receives the lifecycle configuration.
+- `bucketsLifecycleConfigs.LifecycleConfiguration.Rules`: array containing multiple predefined rules.
 - https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json#L19[`Rules.Status`]: status of predefined
-rule (e.g. Enabled | Disabled )
+rule (e.g. Enabled | Disabled ).
 - https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json#L21[`Rules.Expiration.Date`]: the date
 when the expiration will occur. The value must conform to the ISO 8601 format.
 The time is always midnight UTC (e.g. '2019-05-30T00:00:00.000Z').
