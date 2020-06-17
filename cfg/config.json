@@ -173,7 +173,12 @@
             "grpcOstorage"
           ]
         },
-        "list": {
+        "list":{
+          "transport": [
+            "grpcOstorage"
+          ]
+        },
+        "copy":{
           "transport": [
             "grpcOstorage"
           ]
