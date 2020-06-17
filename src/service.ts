@@ -20,8 +20,8 @@ export enum Operation {
 }
 
 export interface Attribute {
-  id: string;
-  value: string;
+  id?: string;
+  value?: string;
 }
 
 export interface Options {
@@ -75,6 +75,60 @@ export interface PutResponse {
   bucket: String;
   url: String;
   options?: Options;
+}
+
+export interface CopyRequest {
+  bucket: string;
+  copySource: string;
+  key: string;
+  meta: Meta;
+  options: Options;
+}
+
+export interface CopyResponse {
+  bucket: string;
+  copySource: string;
+  key: string;
+  meta: Meta;
+  options: Options;
+}
+
+export interface CopyRequestList {
+  items: CopyRequest[];
+}
+
+export interface CopyResponseList {
+  response: CopyResponse[];
+}
+
+// Parameters passed to the S3 copyObject function
+// When replacing an object's metadata ( same object inside the same bucket) either "tagging" or "metadata" is required.
+// When copying the object to another bucket these two params can be skipped but object will be copied with no metadata.
+export interface CopyObjectParams {
+  Bucket: string;
+  CopySource: string;
+  Key: string;
+  ContentEncoding?: string;
+  ContentType?: string;
+  ContentLanguage?: string;
+  ContentDisposition?: string;
+  SSECustomerKeyMD5?: string;
+  TaggingDirective?: string; // "COPY || REPLACE"
+  Tagging?: string; // encoded as URL Query parameters.
+  MetadataDirective?: string; // "COPY || REPLACE"
+  Metadata?: any;
+}
+
+export interface Owner {
+  id: string;
+  value: string;
+}
+
+export interface Meta {
+  created: number; // timestamp
+  modified: number; // timestamp
+  modified_by: string; // ID from last User who modified it
+  owner: Owner[];
 }
 
 export interface Call<T = GetRequest | DeleteRequest | PutRequest> {
@@ -500,6 +554,250 @@ export class Service {
     }
   }
 
+  async copy(call: any, callback: any): Promise<CopyResponseList> {
+    const request = await call.request;
+    let bucket: string;
+    let copySource: string;
+    let key: string;
+    let meta: Meta;
+    let options: Options;
+    let grpcResponse: CopyResponseList = { response: [] };
+    let copyObjectResult;
+
+    if (request && request.items) {
+      const itemsList = request.items;
+      for (const item of itemsList) {
+        bucket = item.bucket;
+        copySource = item.copySource;
+        key = item.key;
+        meta = item.meta;
+        options = item.options;
+
+        // Regex to extract bucket name and key from copySource
+        // ex: copySource= /bucketName/sample-directory/objectName.txt
+        let copySourceStr = copySource.slice(1, copySource.length);
+        const sourceBucketName = copySourceStr.substring(0, copySourceStr.indexOf('/'));
+        const sourceKeyName = copySourceStr.substr(copySourceStr.indexOf('/'), copySourceStr.length);
+
+        // Start - Compose the copyObject params
+        let params: CopyObjectParams = {
+          Bucket: bucket,
+          CopySource: copySource,
+          Key: key
+        };
+
+        // need to iterate and check if there is at least one key set
+        // since the gRPC adds default values for missing fields
+        let optionsExist = false;
+        let optionKeys = Object.keys(options);
+        for (let optKey of optionKeys) {
+          if(!_.isEmpty(options[optKey])) {
+            optionsExist = true;
+            break;
+          }
+        }
+
+        // CASE 1: User provides at least one option => replace all obj meta including tagging
+
+        if (optionsExist) {
+          params.MetadataDirective = 'REPLACE';
+          params.TaggingDirective = 'REPLACE';
+
+          // 1. Add user defined Metadata (this is always generated based on the orgKey input in facade)
+          if (!_.isEmpty(meta)) {
+            params.Metadata = {
+              meta: JSON.stringify(meta),
+              key,
+            };
+          } else {
+            this.logger.error('User has not provided any orgKey!');
+          }
+
+          // 2. Add object metadata if provided
+          // ContentEncoding
+          if (!_.isEmpty(options.encoding)) {
+            params.ContentEncoding = options.encoding;
+          }
+          // ContentType
+          if (!_.isEmpty(options.content_type)) {
+            params.ContentType = options.content_type;
+          }
+          // ContentLanguage
+          if (!_.isEmpty(options.content_language)) {
+            params.ContentLanguage = options.content_language;
+          }
+          // ContentDisposition
+          if (!_.isEmpty(options.content_disposition)) {
+            params.ContentDisposition = options.content_disposition;
+          }
+
+          // 3. Add Tagging if provided [ first convert array of tags to query parameters (it is required by S3) ]
+          let TaggingQueryParams = '';
+          let tagId: string, tagVal: string;
+          if (!_.isEmpty(options.tags)) {
+            const tagsList = options.tags;
+            for (const [i, v] of tagsList.entries()) {
+              tagId = v.id;
+              tagVal = v.value;
+              if(i < options.tags.length - 1) {
+                TaggingQueryParams += tagId + '=' + tagVal + '&';
+              } else {
+                TaggingQueryParams += tagId + '=' + tagVal;
+              }
+            }
+          }
+          if (!_.isEmpty(TaggingQueryParams)) {
+            params.Tagging = TaggingQueryParams;
+          }
+
+          // End - Compose the copyObject params
+
+          // 4. Copy object with new metadata
+          copyObjectResult = await new Promise((resolve, reject) => {
+            this.ossClient.copyObject(params, async (err: any, data) => {
+              if (err) {
+                this.logger.error('Error occurred while copying object:',
+                  {
+                    Bucket: bucket, Key: key, error: err, errorStack: err.stack
+                  });
+                reject(err);
+              } else {
+                const eTag = data.CopyObjectResult.ETag;
+                const lastModified = data.CopyObjectResult.LastModified;
+                this.logger.info('Copy object successful!', {
+                  Bucket: bucket, Key: key, ETag: eTag, LastModified: lastModified
+                });
+                resolve(data);
+              }
+            });
+          });
+
+        } else {
+
+          // CASE 2: No options provided => copy the object as it is and update user defined metadata (owner)
+
+          // 1. Add user defined Metadata ( this is always generated based on the orgKey input in facade )
+          params.MetadataDirective = 'REPLACE';
+          if (!_.isEmpty(meta)) {
+            params.Metadata = {
+              meta: JSON.stringify(meta),
+              key,
+            };
+          } else {
+            this.logger.error('User has not provided any orgKey!');
+          }
+
+          // 2. Add Object metadata
+          // Get the source object's metadata and add it to our copied object
+          const headObjectParams  = { Bucket: sourceBucketName, Key: sourceKeyName };
+          const objectMeta: any = await new Promise((resolve, reject) => {
+            this.ossClient.headObject(headObjectParams, (err, data) => {
+              if (err) {
+                this.logger.error('Error occurred while retrieving metadata for object:',
+                  {
+                    Bucket: sourceBucketName, Key: sourceKeyName, error: err, errorStack: err.stack
+                  });
+                reject(err);
+              } else {
+                resolve(data);
+              }
+            });
+          });
+
+          if (objectMeta) {
+            // ContentEncoding
+            if (objectMeta.ContentEncoding && !_.isEmpty(objectMeta.ContentEncoding)) {
+              params.ContentEncoding = objectMeta.ContentEncoding;
+            }
+            // ContentType
+            if (objectMeta.ContentType && !_.isEmpty(objectMeta.ContentType)) {
+              params.ContentType = objectMeta.ContentType;
+            }
+            // ContentLanguage
+            if (objectMeta.ContentLanguage && !_.isEmpty(objectMeta.ContentLanguage)) {
+              params.ContentLanguage = objectMeta.ContentLanguage;
+            }
+            // ContentDisposition
+            if (objectMeta.ContentDisposition && !_.isEmpty(objectMeta.ContentDisposition)) {
+              params.ContentDisposition = objectMeta.ContentDisposition;
+            }
+          }
+
+          // 3. Add Tagging
+          // Get the source object's existing tagging and add it to our object
+          const objectTagging: any = await new Promise((resolve, reject) => {
+            this.ossClient.getObjectTagging(headObjectParams, async (err: any, data) => {
+              if (err) {
+                this.logger.error('Error occurred while retrieving tagging for object:',
+                  {
+                    Bucket: sourceBucketName, Key: sourceKeyName, error: err, errorStack: err.stack
+                  });
+                resolve(err); // resolve if err, this does not stop the service when tagging not found
+              } else {
+                resolve(data);
+              }
+            });
+          });
+          if (objectTagging && !_.isEmpty(objectTagging.TagSet)) {
+            // first convert array of tags to query parameters (it is required by S3)
+            let TaggingQueryParams = '';
+            let tagId: string, tagVal: string;
+            const tagsList = objectTagging.TagSet;
+            for (const [i, v] of tagsList.entries()) {
+              tagId = v.Key;
+              tagVal = v.Value;
+              if(i < tagsList.length - 1) {
+                TaggingQueryParams += tagId + '=' + tagVal + '&';
+              } else {
+                TaggingQueryParams += tagId + '=' + tagVal;
+              }
+            }
+            if (!_.isEmpty(TaggingQueryParams)) {
+              params.TaggingDirective = 'REPLACE';
+              params.Tagging = TaggingQueryParams;
+            }
+          }
+
+          // End - Compose the copyObject params
+
+          // 4. Copy object with new metadata
+          copyObjectResult = await new Promise((resolve, reject) => {
+            this.ossClient.copyObject(params, async (err: any, data) => {
+              if (err) {
+                this.logger.error('Error occurred while copying object:',
+                  {
+                    Bucket: bucket, Key: key, error: err, errorStack: err.stack
+                  });
+                reject(err);
+              } else {
+                const eTag = data.CopyObjectResult.ETag;
+                const lastModified = data.CopyObjectResult.LastModified;
+                this.logger.info('Copy object successful!', {
+                  Bucket: bucket, Key: key, ETag: eTag, LastModified: lastModified
+                });
+                resolve(data);
+              }
+            });
+          });
+        }
+
+        if (copyObjectResult) {
+          let copiedObject: CopyResponse = {
+            bucket,
+            copySource,
+            key,
+            meta,
+            options
+          };
+          grpcResponse.response.push(copiedObject);
+        } else {
+          this.logger.error('Copy object failed for:', {DestinationBucket: bucket, CopySource: copySource, Key:key, Meta:meta, Options: options});
+        }
+      }
+    }
+    return grpcResponse;
+  }
+
   // Regular expression that checks if the filename string contains
   // only characters described as safe to use in the Amazon S3
   // Object Key Naming Guidelines
@@ -532,7 +830,7 @@ export class Service {
       // convert array of tags to query parameters
       // required by AWS.S3
       let TaggingQueryParams = '';
-      let tagId: string, tagVal: string; let tagIndex: number;
+      let tagId: string, tagVal: string;
       if (options && options.tags) {
         let tags = options.tags;
         for (const [i, v] of tags.entries()) {
