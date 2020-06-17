@@ -15,8 +15,8 @@
     "client": {
       "accessKeyId": "accessKey",
       "secretAccessKey": "secretkey",
-      "aws_host": "test",
-      "aws_endpoint": "127.0.0.1:80"
+      "endpoint": "http://minio:9000",
+      "s3ForcePathStyle": true
     }
   },
   "events": {
