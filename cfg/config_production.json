@@ -13,10 +13,7 @@
   },
   "s3": {
     "client": {
-      "accessKeyId": "accessKey",
-      "secretAccessKey": "secretkey",
-      "endpoint": "http://minio:9000",
-      "s3ForcePathStyle": true
+      "endpoint": "http://minio:9000"
     }
   },
   "events": {
