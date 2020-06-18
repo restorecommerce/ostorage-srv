@@ -171,6 +171,10 @@ When options are provided the metadata is being replaced.
 Requests are performed using `io.restorecommerce.ostorage.CopyRequest` protobuf message as input
 and response is `io.restorecommerce.ostorage.CopyResponse` message.
 
+The copy operation can also be used to update the metadata of an object (including tagging).
+In this case the concatenation of `bucket` and `key` input parameters should match the `copySource` string, in case if only object meta data information
+is specified in the `io.restorecommerce.ostorage.CopyRequest` and if tagging is not specified then by default the tags from source objects are copied to the new object.
+
 `io.restorecommerce.ostorage.CopyRequest`
 
 [width="100%",cols="20%,16%,20%,44%",options="header",]
@@ -186,9 +190,6 @@ and response is `io.restorecommerce.ostorage.CopyResponse` message.
 | Field | Type | Label | Description
 | response | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`[\] io.restorecommerce.ostorage.CopyResponseItem`] | required | List of response objects
 |==============================================================================================================================================
-
-The copy operation can be used to update the metadata of an object (including tagging).
-In this case the concatenation of `bucket` and `key` input parameters should match the `copySource` string.
 
 `io.restorecommerce.ostorage.CopyRequestItem`
 
