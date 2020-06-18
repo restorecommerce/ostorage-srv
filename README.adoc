@@ -80,7 +80,7 @@ is `io.restorecommerce.ostorage.Response` message.
 | length | int32 | optional | ContentLength header - Content size in bytes. This parameter is useful when the content size cannot be determined automatically
 | version | string | optional | x-amz-version-id header - Version ID of the newly created object, in case the bucket has versioning turned on
 | md5 | string | optional | ETag - Entity tag that identifies the newly created object's data
-| tags | [ ] https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto[`io.restorecommerce.access_control.Attribute`] | optional | The tag-set for the object. The tag-set is used for filtering by tag
+| tags | [ ] https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.access_control.Attribute`] | optional | The tag-set for the object. The tag-set is used for filtering by tag
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.Response`
@@ -92,7 +92,7 @@ is `io.restorecommerce.ostorage.Response` message.
 | bucket | string | required | Bucket to which the object is mapped to
 | key | string | optional | Object Key
 | meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | metadata attached to Object
-| tags | [ ] https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/access_control.proto[`io.restorecommerce.access_control.Attribute`] | optional | The tag-set for the object. The tag-set is used for filtering by tag
+| tags | [ ] https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.access_control.Attribute`] | optional | The tag-set for the object. The tag-set is used for filtering by tag
 | length | int32 | optional | Size of uploaded object
 |==============================================================================================================================================
 
@@ -159,6 +159,59 @@ Requests are performed using `io.restorecommerce.ostorage.Bucket` protobuf messa
 | Field | Type | Label | Description
 | bucket | string | required | Bucket to which the object is mapped to
 | key | string | required | Object key
+|==============================================================================================================================================
+
+[#api_ostorage_copy]
+=== `Copy`
+
+Used to copy the Object from one location to another in the Storage Server.
+If options are not provided, the object's metadata is being preserved.
+When options are provided the metadata is being replaced.
+
+Requests are performed using `io.restorecommerce.ostorage.CopyRequest` protobuf message as input
+and response is `io.restorecommerce.ostorage.CopyResponse` message.
+
+`io.restorecommerce.ostorage.CopyRequest`
+
+[width="100%",cols="20%,16%,20%,44%",options="header",]
+|==============================================================================================================================================
+| Field | Type | Label | Description
+| items | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`[\] io.restorecommerce.ostorage.CopyRequestItem`] | required | List of objects to be copied
+|==============================================================================================================================================
+
+`io.restorecommerce.ostorage.CopyResponse`
+
+[width="100%",cols="20%,16%,20%,44%",options="header",]
+|==============================================================================================================================================
+| Field | Type | Label | Description
+| response | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`[\] io.restorecommerce.ostorage.CopyResponseItem`] | required | List of response objects
+|==============================================================================================================================================
+
+The copy operation can be used to update the metadata of an object (including tagging).
+In this case the concatenation of `bucket` and `key` input parameters should match the `copySource` string.
+
+`io.restorecommerce.ostorage.CopyRequestItem`
+
+[width="100%",cols="20%,16%,20%,44%",options="header",]
+|==============================================================================================================================================
+| Field | Type | Label | Description
+| bucket |  string | required | Destination bucket
+| copySource |  string | required | Source path of object to be copied
+| key |  string | required | Name of object to be created
+| meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | user defined metadata attached to Object
+| options | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.ostorage.Options`] | optional | object metadata attached to Object.
+|==============================================================================================================================================
+
+`io.restorecommerce.ostorage.CopyResponseItem`
+
+[width="100%",cols="20%,16%,20%,44%",options="header",]
+|==============================================================================================================================================
+| Field | Type | Label | Description
+| bucket |  string | required | Destination bucket
+| copySource |  string | required | Source path of object to be copied
+| key |  string | required | Name of object to be created
+| meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | user defined metadata attached to Object
+| options | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.ostorage.Options`] | optional | object metadata attached to Object.
 |==============================================================================================================================================
 
 [#events]
