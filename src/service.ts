@@ -414,28 +414,24 @@ export class Service {
     let stream = true;
     let completeBuffer = [];
     let key, bucket, meta, object, options;
+
     while (stream) {
       try {
-        let req = await call.read();
+        let streamRequest = await call.read();
         // Promisify callback to get response
-        req = await new Promise((resolve, reject) => {
-          req((err, response) => {
+        const streamResponse: any = await new Promise((resolve, reject) => {
+          streamRequest((err, response) => {
             if (err) {
-              this.logger.error('Error occurred while uploading object:',
-                {
-                  Key: key, Bucket: bucket, error: err, errorStack: err.stack
-                });
               reject(err);
             }
             resolve(response);
           });
         });
-        bucket = req.bucket;
-        key = req.key;
-        meta = req.meta;
-        object = req.object;
-        options = req.options;
-
+        bucket = streamResponse.bucket;
+        key = streamResponse.key;
+        meta = streamResponse.meta;
+        object = streamResponse.object;
+        options = streamResponse.options;
         // check object name
         if (!this.IsValidObjectName(key)) {
           stream = false;
@@ -449,20 +445,26 @@ export class Service {
         completeBuffer.push(object);
       } catch (e) {
         stream = false;
-        if (e.message === 'Invalid object name') {
-          return e.message;
+        if (e.message != 'stream end') {
+          this.logger.error('Error occurred while storing object...', e);
+          return {bucket: e.message}; // if you throw without a catch block you get an error
         }
-        if (e.message === 'stream end') {
-          // store object to storage server using streaming connection
-          const response = await this.storeObject(
-            key,
-            bucket,
-            Buffer.concat(completeBuffer), // object
-            meta,
-            options
-          );
-          return response;
-        }
+      }
+    }
+    if (!stream) {
+      let response;
+      try {
+        response = await this.storeObject(
+          key,
+          bucket,
+          Buffer.concat(completeBuffer), // object
+          meta,
+          options
+        );
+        return response;
+      } catch(e) {
+        this.logger.error('Error occurred while storing object.', e);
+        throw e; // if you throw without a catch block you get an error
       }
     }
   }
@@ -774,7 +776,7 @@ export class Service {
             {
               Key: key, Bucket: bucket, error: err, errStack: err.stack
             });
-          return;
+          throw err;
         } else {
           return data;
         }

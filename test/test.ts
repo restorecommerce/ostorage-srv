@@ -88,13 +88,14 @@ describe('testing ostorage-srv', () => {
     });
 
     it('Should return an error if an invalid object name is used', async () => {
-      let response;
       // create streaming client request
       const clientConfig = cfg.get('grpc-client:service-ostorage');
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
       const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
       const call = await put();
       const readStream = fs.createReadStream('./test/cfg/config.json');
+
+      let streamRequest;
       readStream.on('data', async (chunk) => {
         const data = {
           bucket: 'test',
@@ -106,26 +107,36 @@ describe('testing ostorage-srv', () => {
         await call.write(data);
       });
 
-      response = await new Promise(async (resolve, reject) => {
+
+      streamRequest = await call.end((err, data) => {
+        if (err) {
+          return err;
+        } else {
+          return data;
+        }
+      });
+
+      let FinalResponse: any = await new Promise(async (resolve, reject) => {
         readStream.on('end', async () => {
-          response = await call.end((err, data) => { });
-          response = await new Promise((resolve, reject) => {
-            response((err, data) => {
+
+          const streamingResponse = await new Promise((resolve, reject) => {
+            streamRequest((err, data) => {
               if (err) {
-                reject(err);
+                resolve(err);
               } else {
                 resolve(data);
               }
             });
           });
-          resolve(response);
-          return response;
+          resolve(streamingResponse);
+          return streamingResponse;
         });
       });
 
       // Response object should include an error in the protos
-      should.exist(response.url);
-      response.url.should.equal('Invalid object name');
+
+      should.exist(FinalResponse.bucket);
+      FinalResponse.bucket.should.equal('Invalid object name');
 
       sleep.sleep(3);
     });
