@@ -1,3 +1,6 @@
+*.d.ts
+*.js
+
 node_modules/
 npm-debug.log
 
@@ -11,6 +14,7 @@ pid/
 .directory
 
 !setupTopics.js
+!.eslintrc.js
 
 lib
 
@@ -23,6 +27,3 @@ config
 id_rsa
 id_rsa.pub
 known_hosts
-
-test/test.d.ts
-test/test.js
