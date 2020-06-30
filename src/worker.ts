@@ -5,6 +5,8 @@ import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Service } from './service';
 import { OStorageCommandInterface } from './commandInterface';
+import { createClient } from 'redis';
+import { initAuthZ, ACSAuthZ } from '@restorecommerce/acs-client';
 
 export class Worker {
   events: Events;
@@ -13,6 +15,7 @@ export class Worker {
   cfg: any;
   topics: any;
   offsetStore: chassis.OffsetStore;
+  authZ: ACSAuthZ;
   constructor(cfg?: any) {
     this.cfg = cfg || sconfig(process.cwd());
     this.logger = new Logger(this.cfg.get('logger'));
@@ -33,7 +36,15 @@ export class Worker {
     await events.start();
     this.offsetStore = new chassis.OffsetStore(events, cfg, logger);
 
-    const oss = new Service(cfg.get(), logger);
+    let authZ = await initAuthZ(this.cfg) as ACSAuthZ;
+    this.authZ = authZ;
+
+    // init redisClient
+    const redisConfig = cfg.get('redis');
+    redisConfig.db = cfg.get('redis:db-indexes:db-subject');
+    const redisClient = new createClient(redisConfig);
+
+    const oss = new Service(cfg.get(), logger, this.authZ, redisClient);
     const cis = new OStorageCommandInterface(server, cfg.get(), logger, events);
 
     const eventListener = async (msg: any, context: any, config: any, eventName: string) => {
