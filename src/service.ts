@@ -555,10 +555,10 @@ export class Service {
     await new Promise<any>((resolve, reject) => {
       downloadable
         .on('httpData', async (chunk) => {
-          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj });
+          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
         })
         .on('data', async (chunk) => {
-          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj });
+          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
         })
         .on('httpDone', async () => {
           resolve();
@@ -620,7 +620,9 @@ export class Service {
     if (!resource.meta) {
       resource.meta = {};
     }
-    resource.meta.owner = ownerAttributes;
+    if (!resource.meta.owner) {
+      resource.meta.owner = ownerAttributes;
+    }
     return resource;
   }
 
