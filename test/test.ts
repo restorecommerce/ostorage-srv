@@ -115,32 +115,6 @@ describe('testing ostorage-srv', () => {
       response.url.should.equal('//test/config.json');
       sleep.sleep(3);
     });
-    it('should get metadata of the Object', async () => {
-      const clientConfig = cfg.get('grpc-client:service-ostorage');
-      const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
-      const get = client.makeEndpoint('get', clientConfig.publisher.instances[0]);
-      const call = await get({
-        key: 'config.json',
-        bucket: 'test',
-        flag: true
-      });
-      let result;
-      result = await call.read();
-      result = await new Promise((resolve, reject) => {
-        result((err, response) => {
-          if (err) {
-            reject(err);
-          }
-          resolve(response);
-        });
-      });
-      should.exist(result);
-      should.exist(result.key);
-      should.exist(result.url);
-      should.exist(result.object);
-      meta.owner.should.deepEqual(result.meta.owner);
-      sleep.sleep(3);
-    });
     it('should get the Object with response streaming', async () => {
       const clientConfig = cfg.get('grpc-client:service-ostorage');
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);

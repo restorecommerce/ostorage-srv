@@ -58,6 +58,8 @@ export interface GetRequest {
 export interface ListRequest {
   bucket: string;
   filter: FilterType;
+  subject?: Subject;
+  api_key?: string;
 }
 
 export interface DeleteRequest {
@@ -179,9 +181,9 @@ export class Service {
   cfg: any;
 
   constructor(cfg: any, private logger: any, authZ: ACSAuthZ, redisClient: RedisClient) {
-    this.ossClient = new aws.S3(cfg.s3.client);
-    this.buckets = cfg.s3.buckets || [];
-    this.bucketsLifecycleConfigs = cfg.s3.bucketsLifecycleConfigs;
+    this.ossClient = new aws.S3(cfg.get('s3:client'));
+    this.buckets = cfg.get('s3:buckets') || [];
+    this.bucketsLifecycleConfigs = cfg.get('s3.bucketsLifecycleConfigs');
     this.authZ = authZ;
     this.redisClient = redisClient;
     this.cfg = cfg;
@@ -299,9 +301,49 @@ export class Service {
     }
   }
 
-  async list(request: Call<ListRequest>, context?: any): Promise<any> {
-    let { bucket, filter } = request.request;
+  private filterObjects(hasFilter, requestFilter, object, objectToReturn) {
+    // if filter is provided return data based on filter
+    if (hasFilter && requestFilter.field == META_OWNER && requestFilter.operation == EQ && requestFilter.value) {
+      const MetaOwnerVal = object.meta.owner[1].value;
+      // check only for the files matching the requested Owner Organizations
+      if (requestFilter.value == MetaOwnerVal) {
+        objectToReturn.push(object);
+      }
+    } else { // else return all data
+      objectToReturn.push(object);
+    }
+  }
 
+  async list(call: Call<ListRequest>, context?: any): Promise<any> {
+    let { bucket, filter } = call.request;
+
+    let subject = call.request.subject;
+    let api_key = call.request.api_key;
+    subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
+    let resource: any = { bucket, filter };
+    let acsResponse: AccessResponse;
+    try {
+      // target entity for ACS is bucket name here
+      acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
+        bucket, this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    const customArgs = resource.custom_arguments;
+    const ownerIndictaorEntURN = this.cfg.get('authorization:urns:ownerIndicatoryEntity');
+    const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
+    let customArgsFilter, ownerValues, ownerIndicatorEntity;
+    if (customArgs) {
+      customArgsFilter = JSON.parse(customArgs.value.toString());
+      // applicable target owner instances
+      ownerValues = customArgsFilter.instance;
+      ownerIndicatorEntity = customArgsFilter.entity;
+    }
     // if request contains a filter return data based on it
     let hasFilter = false;
     let requestFilter;
@@ -347,16 +389,26 @@ export class Service {
               objectMeta = JSON.parse(meta.meta);
             }
             let object = { object_name: objectName, url, meta: objectMeta };
-
-            // if filter is provided return data based on filter
-            if (hasFilter && requestFilter.field == META_OWNER && requestFilter.operation == EQ && requestFilter.value) {
-              const MetaOwnerVal = object.meta.owner[1].value;
-              // check only for the files matching the requested Owner Organizations
-              if (requestFilter.value == MetaOwnerVal) {
-                objectToReturn.push(object);
+            // authorization filter check
+            if (this.cfg.get('authorization:enabled')) {
+              // if target objects owner instance `ownerInst` is contained in the
+              // list of applicable `ownerValues` returned from ACS ie. ownerValues.includes(ownerInst)
+              // then its considred a match for further filtering based on filter field if it exists
+              let match = false;
+              let ownerInst;
+              for (let idVal of objectMeta) {
+                if (idVal.id === ownerIndictaorEntURN && idVal.value === ownerIndicatorEntity) {
+                  match = true;
+                }
+                if (idVal.id === ownerInstanceURN) {
+                  ownerInst = idVal.value;
+                }
               }
-            } else { // else return all data
-              objectToReturn.push(object);
+              if (match && ownerInst && ownerValues.includes(ownerInst)) {
+                this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
+              }
+            } else {
+              this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
             }
           }
         }
@@ -503,17 +555,15 @@ export class Service {
     await new Promise<any>((resolve, reject) => {
       downloadable
         .on('httpData', async (chunk) => {
-          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}` });
+          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj });
         })
         .on('data', async (chunk) => {
-          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}` });
+          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj });
         })
         .on('httpDone', async () => {
           resolve();
         })
         .on('end', async (chunk) => {
-          // write metaObj and tagging options before clossing connection
-          await call.write({ options: optionsObj, meta: metaObj });
           await call.end();
           resolve();
         })
@@ -984,9 +1034,28 @@ export class Service {
       throw new InvalidKey(key);
     }
 
+    let headObject: any;
+    let resources = { Bucket: bucket, Key: key };
+    headObject = await new Promise((resolve, reject) => {
+      this.ossClient.headObject(resources, async (err: any, data) => {
+        if (err) {
+          // map the s3 error codes to standard chassis-srv errors
+          if (err.code === 'NotFound') {
+            err = new errors.NotFound('The specified key was not found');
+            err.code = 404;
+          }
+          this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
+        }
+        resolve(data);
+      });
+    });
+    // capture meta data from response message
+    let metaObj;
+    if (headObject && headObject.Metadata && headObject.Metadata.meta) {
+      metaObj = JSON.parse(headObject.Metadata.meta);
+    }
+    Object.assign(resources, { meta: metaObj });
     let acsResponse: AccessResponse;
-    let resources = call.request;
-    // TODO updated meta data in object from head object before calling here
     try {
       acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
         bucket, this);

@@ -40,5 +40,15 @@
         "addr": "ostorage-srv:50051"
       }
     ]
+  },
+  "client": {
+    "acs-srv": {
+      "publisher": {
+        "name": "static",
+        "instances": [
+          "grpc://access-contorl-srv:50061"
+        ]
+      }
+    }
   }
 }

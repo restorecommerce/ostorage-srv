@@ -44,7 +44,7 @@ export class Worker {
     redisConfig.db = cfg.get('redis:db-indexes:db-subject');
     const redisClient = new createClient(redisConfig);
 
-    const oss = new Service(cfg.get(), logger, this.authZ, redisClient);
+    const oss = new Service(cfg, logger, this.authZ, redisClient);
     const cis = new OStorageCommandInterface(server, cfg.get(), logger, events);
 
     const eventListener = async (msg: any, context: any, config: any, eventName: string) => {
