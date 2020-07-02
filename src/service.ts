@@ -6,7 +6,7 @@ import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
 import { RedisClient } from 'redis';
 import { getSubjectFromRedis, checkAccessRequest, AccessResponse } from './utils';
-import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Resource, Subject } from '@restorecommerce/acs-client';
+import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Resource, Subject, updateConfig } from '@restorecommerce/acs-client';
 
 const META_OWNER = 'meta.owner';
 const EQ = 'eq';
@@ -179,6 +179,7 @@ export class Service {
   redisClient: RedisClient;
   authZ: ACSAuthZ;
   cfg: any;
+  authZCheck: boolean;
 
   constructor(cfg: any, private logger: any, authZ: ACSAuthZ, redisClient: RedisClient) {
     this.ossClient = new aws.S3(cfg.get('s3:client'));
@@ -187,6 +188,7 @@ export class Service {
     this.authZ = authZ;
     this.redisClient = redisClient;
     this.cfg = cfg;
+    this.authZCheck = cfg.get('authorization:enabled');
   }
 
   async start(): Promise<void> {
@@ -1081,5 +1083,44 @@ export class Service {
       throw result.$response.error;
     }
     this.logger.info(`Successfully deleted object ${key} from bucket ${bucket}`);
+  }
+
+  /**
+   *  disable access control
+   */
+  disableAC() {
+    try {
+      this.cfg.set('authorization:enabled', false);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught disabling authorization:', { err });
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
+  }
+
+  /**
+   *  enables access control
+   */
+  enableAC() {
+    try {
+      this.cfg.set('authorization:enabled', true);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught enabling authorization:', { err });
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
+  }
+
+  /**
+   *  restore AC state to previous vale either before enabling or disabling AC
+   */
+  restoreAC() {
+    try {
+      this.cfg.set('authorization:enabled', this.authZCheck);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught enabling authorization:', { err });
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
   }
 }

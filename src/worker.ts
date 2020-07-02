@@ -16,6 +16,7 @@ export class Worker {
   topics: any;
   offsetStore: chassis.OffsetStore;
   authZ: ACSAuthZ;
+  oss: Service;
   constructor(cfg?: any) {
     this.cfg = cfg || sconfig(process.cwd());
     this.logger = new Logger(this.cfg.get('logger'));
@@ -46,6 +47,7 @@ export class Worker {
 
     const oss = new Service(cfg, logger, this.authZ, redisClient);
     const cis = new OStorageCommandInterface(server, cfg.get(), logger, events);
+    this.oss = oss;
 
     const eventListener = async (msg: any, context: any, config: any, eventName: string) => {
       // command events

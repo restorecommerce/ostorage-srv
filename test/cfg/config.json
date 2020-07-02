@@ -220,8 +220,8 @@
   },
   "authorization": {
     "service": "ostorage-srv",
-    "enabled": false,
-    "enforce": false,
+    "enabled": true,
+    "enforce": true,
     "urns": {
       "entity": "urn:restorecommerce:acs:names:model:entity",
       "user": "urn:restorecommerce:acs:model:user.User",
