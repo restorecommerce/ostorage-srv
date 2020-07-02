@@ -37,6 +37,10 @@ export interface RequestType {
 }
 
 export interface GetRequest {
+  request: GRequest;
+}
+
+export interface GRequest {
   key: string;
   bucket: string;
   flag: boolean;
@@ -125,34 +129,4 @@ export interface Meta {
 
 export interface Call<T = GetRequest | DeleteRequest | PutRequest> {
   request: T;
-}
-
-export class InvalidBucketName extends Error {
-  details: any;
-  constructor(details: any) {
-    super();
-    this.name = this.constructor.name;
-    this.message = 'Invalid bucket name';
-    this.details = details;
-  }
-}
-
-export class InvalidKey extends Error {
-  details: any;
-  constructor(details: any) {
-    super();
-    this.name = this.constructor.name;
-    this.message = 'Invalid key';
-    this.details = details;
-  }
-}
-
-export class InvalidObjectName extends Error {
-  details: any;
-  constructor(details: any) {
-    super();
-    this.name = this.constructor.name;
-    this.message = 'Invalid object name';
-    this.details = details;
-  }
 }

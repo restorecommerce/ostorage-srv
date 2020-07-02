@@ -9,7 +9,7 @@ import {
   GetRequest, ListRequest, DeleteRequest, Call,
   PutRequest, PutResponse, CopyRequest, CopyResponse,
   CopyRequestList, CopyResponseList, CopyObjectParams,
-  Owner, Meta, InvalidBucketName, InvalidKey, InvalidObjectName
+  Owner, Meta
 } from './interfaces';
 
 const META_OWNER = 'meta.owner';
@@ -173,7 +173,7 @@ export class Service {
     for (const value of buckets) {
       if (value != null) {
         let bucketName = { Bucket: value };
-        const AllObjects: any = await new Promise((resolve, reject) => {
+        const objList: any = await new Promise((resolve, reject) => {
           this.ossClient.listObjectsV2(bucketName, (err, data) => {
             if (err) {
               this.logger.error('Error occurred while listing objects',
@@ -187,8 +187,8 @@ export class Service {
           });
         });
 
-        if (AllObjects != null) {
-          for (let eachObj of AllObjects) {
+        if (objList != null) {
+          for (let eachObj of objList) {
             const headObjectParams = { Bucket: value, Key: eachObj.Key };
             const meta: any = await new Promise((resolve, reject) => {
               this.ossClient.headObject(headObjectParams, (err, data) => {
@@ -233,10 +233,10 @@ export class Service {
     // get gRPC call request
     const { bucket, key, flag, download } = call.request;
     if (!_.includes(this.buckets, bucket)) {
-      return await call.end(new InvalidBucketName(bucket));
+      return await call.end(new errors.InvalidArgument(`Invalid bucket name ${bucket}`));
     }
     if (!key) {
-      return await call.end(new InvalidKey(key));
+      return await call.end(new errors.InvalidArgument(`Invalid key name ${key}`));
     }
 
     // get metadata of the object stored in the S3 object storage
@@ -435,11 +435,11 @@ export class Service {
         // check object name
         if (!this.IsValidObjectName(key)) {
           stream = false;
-          throw new InvalidObjectName(key);
+          throw new errors.InvalidArgument(`Invalid Object name ${key}`);
         }
         if (!_.includes(this.buckets, bucket)) {
           stream = false;
-          throw new InvalidBucketName(bucket);
+          throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
         }
 
         completeBuffer.push(object);
@@ -447,7 +447,7 @@ export class Service {
         stream = false;
         if (e.message != 'stream end') {
           this.logger.error('Error occurred while storing object...', e);
-          return {bucket: e.message}; // if you throw without a catch block you get an error
+          throw e;
         }
       }
     }
@@ -822,7 +822,7 @@ export class Service {
   async delete(call: Call<DeleteRequest>, context?: any): Promise<void> {
     const { bucket, key } = call.request;
     if (!_.includes(this.buckets, bucket)) {
-      throw new InvalidBucketName(bucket);
+      throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
     }
 
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
@@ -835,7 +835,7 @@ export class Service {
       }
     }
     if (!objectExists) {
-      throw new InvalidKey(key);
+      throw new errors.InvalidArgument('Invalid key name');
     }
     const result = await this.ossClient.deleteObject({
       Bucket: bucket,

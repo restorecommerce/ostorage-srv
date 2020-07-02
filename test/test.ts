@@ -27,11 +27,11 @@ const options = {
   tags: [
     {
       id: 'id_1',
-      value:'value_1'
+      value: 'value_1'
     },
     {
       id: 'id_2',
-      value:'value_2'
+      value: 'value_2'
     }
   ]
 };
@@ -116,12 +116,13 @@ describe('testing ostorage-srv', () => {
         }
       });
 
-      let FinalResponse: any = await new Promise(async (resolve, reject) => {
+      await new Promise(async (resolve, reject) => {
         readStream.on('end', async () => {
-
           const streamingResponse = await new Promise((resolve, reject) => {
             streamRequest((err, data) => {
               if (err) {
+                should.exist(err.message);
+                err.details.should.equal('Invalid Object name config{}.json');
                 resolve(err);
               } else {
                 resolve(data);
@@ -132,12 +133,6 @@ describe('testing ostorage-srv', () => {
           return streamingResponse;
         });
       });
-
-      // Response object should include an error in the protos
-
-      should.exist(FinalResponse.bucket);
-      FinalResponse.bucket.should.equal('Invalid object name');
-
       sleep.sleep(3);
     });
 
@@ -313,7 +308,7 @@ describe('testing ostorage-srv', () => {
             content_type: 'text/html',
             content_language: 'de-DE',
             content_disposition: 'form-data',
-            tags : [
+            tags: [
               {
                 id: 'id_1',
                 value: 'value_1'
