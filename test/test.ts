@@ -118,7 +118,7 @@ describe('testing ostorage-srv with ACS enabled', () => {
   };
 
   describe('Object Storage with ACS enabled', () => {
-    it('With valid subject scope should store the data to storage server using request streaming and then delete the object', async () => {
+    it('With valid subject scope should store the data to storage server using request streaming', async () => {
       // strat acs mock service
       await connect('grpc-client:service-ostorage', '');
       // PERMIT mock
@@ -447,9 +447,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       response.meta.modified.should.equal(0);
       response.meta.modified_by.should.equal('SYSTEM');
       response.meta.owner[0].id.should.equal('urn:restorecommerce:acs:names:ownerIndicatoryEntity');
-      response.meta.owner[0].value.should.equal('urn:restorecommerce:acs:model:user.User');
+      response.meta.owner[0].value.should.equal('urn:restorecommerce:acs:model:organization.Organization');
       response.meta.owner[1].id.should.equal('urn:restorecommerce:acs:names:ownerInstance');
-      response.meta.owner[1].value.should.equal('UserID');
+      response.meta.owner[1].value.should.equal('orgC');
 
       // check tags
       response.tags[0].id.should.equal('id_1');
@@ -598,7 +598,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       response[0].bucket.should.equal('test');
       response[0].copySource.should.equal('test/config.json');
       response[0].key.should.equal('config.json');
-      response[0].meta.owner[1].value.should.equal('UserID');
+      response[0].meta.owner.should.deepEqual(meta.owner);
       response[0].options.encoding.should.equal('gzip');
       response[0].options.tags[0].id.should.equal('id_1');
       sleep.sleep(3);

@@ -517,11 +517,11 @@ export class Service {
     }
   }
 
-/**
- * creates meta object containing owner information
- * @param reaources resource
- * @param orgKey orgKey
- */
+  /**
+   * creates meta object containing owner information
+   * @param reaources resource
+   * @param orgKey orgKey
+   */
   private createMetadata(resource: any, subject: Subject): Resource {
     let targetScope;
     if (subject) {
