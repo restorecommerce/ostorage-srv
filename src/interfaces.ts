@@ -1,3 +1,5 @@
+import { Subject } from '@restorecommerce/acs-client';
+
 export enum Operation {
   GT = 'gt',
   LT = 'lt',
@@ -49,12 +51,16 @@ export interface GRequest {
 export interface ListRequest {
   bucket: string;
   filter: FilterType;
+  subject?: Subject;
+  api_key?: string;
 }
 
 export interface DeleteRequest {
   key: string;
   bucket: string;
   filter: FilterType;
+  subject?: Subject;
+  api_key?: string;
 }
 
 export interface PutRequest {
