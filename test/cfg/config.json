@@ -54,7 +54,8 @@
           "put": {},
           "get": {},
           "delete": {},
-          "list": {}
+          "list": {},
+          "copy": {}
         }
       }
   },
@@ -174,6 +175,11 @@
           ]
         },
         "list": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        },
+        "copy":{
           "transport": [
             "grpcOstorage"
           ]

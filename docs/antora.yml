@@ -1,0 +1,5 @@
+name: ostorage-srv
+title: Object Storage Service
+version: master
+nav:
+  - modules/ROOT/nav.adoc

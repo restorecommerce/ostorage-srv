@@ -7,170 +7,16 @@ import { toObject } from '@restorecommerce/resource-base-interface';
 import { RedisClient } from 'redis';
 import { getSubjectFromRedis, checkAccessRequest, AccessResponse } from './utils';
 import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Resource, Subject, updateConfig } from '@restorecommerce/acs-client';
+import {
+  Attribute, Options, FilterType, RequestType,
+  GetRequest, ListRequest, DeleteRequest, Call,
+  PutRequest, PutResponse, CopyRequest, CopyResponse,
+  CopyRequestList, CopyResponseList, CopyObjectParams,
+  Owner, Meta
+} from './interfaces';
 
 const META_OWNER = 'meta.owner';
 const EQ = 'eq';
-
-export enum Operation {
-  GT = 'gt',
-  LT = 'lt',
-  LTE = 'lte',
-  GTE = 'gte',
-  EQ = 'eq',
-  IS_EMPTY = 'isEmpty',
-  IN = 'in',
-  iLIKE = 'iLike'
-}
-
-export interface Attribute {
-  id?: string;
-  value?: string;
-}
-
-export interface Options {
-  encoding?: string;
-  content_type?: string;
-  content_language?: string;
-  content_disposition?: string;
-  length?: number;
-  version?: string;
-  md5?: string;
-  tags?: Attribute[];
-}
-
-export interface FilterType {
-  field?: string;
-  value?: string;
-  operation: Operation;
-}
-
-export interface RequestType {
-  bucket: string;
-  filter?: FilterType;
-}
-
-export interface GetRequest {
-  key: string;
-  bucket: string;
-  flag: boolean;
-}
-
-export interface ListRequest {
-  bucket: string;
-  filter: FilterType;
-  subject?: Subject;
-  api_key?: string;
-}
-
-export interface DeleteRequest {
-  key: string;
-  bucket: string;
-  filter: FilterType;
-  subject?: Subject;
-  api_key?: string;
-}
-
-export interface PutRequest {
-  key: string;
-  bucket: string;
-  meta: any;
-  object: Buffer;
-}
-
-export interface PutResponse {
-  key: String;
-  bucket: String;
-  url: String;
-  options?: Options;
-}
-
-export interface CopyRequest {
-  bucket: string;
-  copySource: string;
-  key: string;
-  meta: Meta;
-  options: Options;
-}
-
-export interface CopyResponse {
-  bucket: string;
-  copySource: string;
-  key: string;
-  meta: Meta;
-  options: Options;
-}
-
-export interface CopyRequestList {
-  items: CopyRequest[];
-}
-
-export interface CopyResponseList {
-  response: CopyResponse[];
-}
-
-// Parameters passed to the S3 copyObject function
-// When replacing an object's metadata ( same object inside the same bucket) either "tagging" or "metadata" is required.
-// When copying the object to another bucket these two params can be skipped but object will be copied with no metadata.
-export interface CopyObjectParams {
-  Bucket: string;
-  CopySource: string;
-  Key: string;
-  ContentEncoding?: string;
-  ContentType?: string;
-  ContentLanguage?: string;
-  ContentDisposition?: string;
-  SSECustomerKeyMD5?: string;
-  TaggingDirective?: string; // "COPY || REPLACE"
-  Tagging?: string; // encoded as URL Query parameters.
-  MetadataDirective?: string; // "COPY || REPLACE"
-  Metadata?: any;
-}
-
-export interface Owner {
-  id: string;
-  value: string;
-}
-
-export interface Meta {
-  created: number; // timestamp
-  modified: number; // timestamp
-  modified_by: string; // ID from last User who modified it
-  owner: Owner[];
-}
-
-export interface Call<T = GetRequest | DeleteRequest | PutRequest> {
-  request: T;
-}
-
-export class InvalidBucketName extends Error {
-  details: any;
-  constructor(details: any) {
-    super();
-    this.name = this.constructor.name;
-    this.message = 'Invalid bucket name';
-    this.details = details;
-  }
-}
-
-export class InvalidKey extends Error {
-  details: any;
-  constructor(details: any) {
-    super();
-    this.name = this.constructor.name;
-    this.message = 'Invalid key';
-    this.details = details;
-  }
-}
-
-export class IsValidObjectName extends Error {
-  details: any;
-  constructor(details: any) {
-    super();
-    this.name = this.constructor.name;
-    this.message = 'Invalid object name';
-    this.details = details;
-  }
-}
 
 export class Service {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
@@ -220,12 +66,26 @@ export class Service {
       await new Promise((resolve, reject) => {
         this.ossClient.getBucketLifecycleConfiguration({ Bucket: bucket }, (err, data) => {
           if (err) {
-            this.logger.info(`No rules are preconfigured for bucket: ${bucket}`);
-            resolve(err);
-          }
-          if (data && data.Rules) {
-            existingBucketRules.push(bucket);
-            resolve(data);
+            if (err.code == 'NoSuchLifecycleConfiguration') {
+              this.logger.info(`No rules are preconfigured for bucket: ${bucket}`);
+              resolve(err);
+            } else {
+              this.logger.error('Error occurred while retrieving BucketLifecycleConfiguration for bucket:',
+                {
+                  Bucket: bucket, error: err, errorStack: err.stack
+                });
+              reject(err);
+            }
+          } else {
+            if (data && data.Rules) {
+              // rules are found, adding them to the list
+              existingBucketRules.push(bucket);
+              resolve(data);
+            } else {
+              // no data found
+              this.logger.error(`No data found! Error occurred while retrieving BucketLifecycleConfiguration for bucket: ${bucket}`);
+              reject(data);
+            }
           }
         });
       });
@@ -249,12 +109,11 @@ export class Service {
         await new Promise((resolve, reject) => {
           this.ossClient.deleteBucketLifecycle({ Bucket: bucket }, (err, data) => {
             if (err) { // an error occurred
-              this.logger.error('Error occurred while removing bucket configuration for bucket:',
+              this.logger.error('Error occurred while removing BucketLifecycleConfiguration for bucket:',
                 {
                   Bucket: bucket, error: err, errorStack: err.stack
                 });
               reject(err);
-              return;
             } else { // successful response
               this.logger.info(`Successfully removed BucketLifecycleConfiguration for bucket: ${bucket}`);
               resolve(data);
@@ -269,10 +128,11 @@ export class Service {
         await new Promise((resolve, reject) => {
           this.ossClient.putBucketLifecycleConfiguration(bucketLifecycleParams, (err, data) => {
             if (err) { // an error occurred
-              this.logger.error('Error occurred while adding bucket configuration for:',
+              this.logger.error('Error occurred while adding BucketLifecycleConfiguration for:',
                 {
                   bucket: bucketName, error: err, errorStack: err.stack
                 });
+              reject(err);
             } else { // successful response
               this.logger.info(`Successfully added BucketLifecycleConfiguration for bucket: ${bucketName}`);
               resolve(data);
@@ -287,12 +147,11 @@ export class Service {
         await new Promise((resolve, reject) => {
           this.ossClient.deleteBucketLifecycle({ Bucket: existingBucketRule }, (err, data) => {
             if (err) { // an error occurred
-              this.logger.error('Error occurred while removing bucket configuration for bucket:',
+              this.logger.error('Error occurred while removing BucketLifecycleConfiguration for bucket:',
                 {
                   bucket: existingBucketRule, error: err, errorStack: err.stack
                 });
               reject(err);
-              return;
             } else { // successful response
               this.logger.info(`Successfully removed BucketLifecycleConfiguration for bucket: ${existingBucketRule}`);
               resolve(data);
@@ -356,31 +215,42 @@ export class Service {
     let buckets = [];
     if (bucket) {
       buckets.push(bucket);
-    }
-    else {
+    } else {
       buckets = this.buckets;
     }
     let objectToReturn = [];
+
     for (const value of buckets) {
       if (value != null) {
         let bucketName = { Bucket: value };
         const objList: any = await new Promise((resolve, reject) => {
           this.ossClient.listObjectsV2(bucketName, (err, data) => {
-            if (err)
+            if (err) {
+              this.logger.error('Error occurred while listing objects',
+                {
+                  bucket: bucketName, error: err, errorStack: err.stack
+                });
               reject(err);
-            else
+            } else {
               return resolve(data.Contents);
+            }
           });
         });
+
         if (objList != null) {
           for (let eachObj of objList) {
             const headObjectParams = { Bucket: value, Key: eachObj.Key };
             const meta: any = await new Promise((resolve, reject) => {
               this.ossClient.headObject(headObjectParams, (err, data) => {
                 if (err) {
+                  this.logger.error('Error occurred while reading meta data for objects',
+                    {
+                      bucket: bucketName, error: err, errorStack: err.stack
+                    });
                   reject(err);
+                } else {
+                  resolve(data.Metadata);
                 }
-                resolve(data.Metadata);
               });
             });
             const url = `//${value}/${meta.key}`;
@@ -421,17 +291,19 @@ export class Service {
   }
 
   async get(call: any, context?: any): Promise<any> {
+
     // get gRPC call request
     const { bucket, key, download } = call.request;
     let subject = call.request.subject;
     let api_key = call.request.api_key;
     // GET meta from stored object and query for accessReq with this meta
     if (!_.includes(this.buckets, bucket)) {
-      return await call.end(new InvalidBucketName(bucket));
+      return await call.end(new errors.InvalidArgument(`Invalid bucket name ${bucket}`));
     }
     if (!key) {
-      return await call.end(new InvalidKey(key));
+      return await call.end(new errors.InvalidArgument(`Invalid key name ${key}`));
     }
+
     // get metadata of the object stored in the S3 object storage
     const params = { Bucket: bucket, Key: key };
     let headObject: any;
@@ -461,10 +333,15 @@ export class Service {
               err = new errors.NotFound('The specified key was not found');
               err.code = 404;
             }
-            this.logger.error('Error occurred while retrieving tags for key:', { Key: key, error: err });
+            this.logger.error('Error occurred while retrieving metadata for key:',
+              {
+                Key: key, error: err, errorStack: err.stack
+              });
+            reject(err);
             return await call.end(err);
+          } else {
+            resolve(data);
           }
-          resolve(data);
         });
       });
     } catch (err) {
@@ -487,117 +364,160 @@ export class Service {
       }
       if (headObject.ContentType) {
         content_type = headObject.ContentType;
-      }
-      if (headObject.ContentLanguage) {
-        content_language = headObject.ContentLanguage;
-      }
-      // check download param
-      if (download) {
-        content_disposition = 'attachment';
-      } else {
-        content_disposition = 'inline';
-      }
-      if (headObject.ContentLength) {
-        length = headObject.ContentLength;
-      }
-      if (headObject.ETag) {
-        md5 = headObject.ETag;
-      }
-      if (headObject['x-amz-version-id']) {
-        version = headObject['x-amz-version-id'];
-      }
-    }
-    let tags: Attribute[] = [];
-    let tagObj: Attribute;
-    if (objectTagging) {
-      // transform received object to respect our own defined structure
-      let receivedTags = objectTagging.TagSet;
+        // get object tagging of the object stored in the S3 object storage
+        let objectTagging: any;
+        try {
+          objectTagging = await new Promise((resolve, reject) => {
+            this.ossClient.getObjectTagging(params, async (err: any, data) => {
+              if (err) {
+                // map the s3 error codes to standard chassis-srv errors
+                if (err.code === 'NotFound') {
+                  err = new errors.NotFound('The specified key was not found');
+                  err.code = 404;
+                }
+                this.logger.error('Error occurred while retrieving tags for key:',
+                  {
+                    Key: key, error: err, errorStack: err.stack
+                  });
+                await call.end(err);
+                return reject(err);
+              } else {
+                resolve(data);
+              }
+            });
+          });
+        } catch (err) {
+          this.logger.info('No object tagging found for key:',
+            {
+              Key: key, error: err, errorStack: err.stack
+            });
+        }
 
-      for (let i = 0; i < receivedTags.length; i++) {
-        tagObj = {
-          id: receivedTags[i].Key,
-          value: receivedTags[i].Value
-        };
-        tags.push(tagObj);
+        // capture meta data from response message
+        let metaObj;
+        if (headObject && headObject.Metadata && headObject.Metadata.meta) {
+          metaObj = JSON.parse(headObject.Metadata.meta);
+        }
+        if (headObject.ContentLanguage) {
+          content_language = headObject.ContentLanguage;
+        }
+        // check download param
+        if (download) {
+          content_disposition = 'attachment';
+        } else {
+          content_disposition = 'inline';
+        }
+        if (headObject.ContentLength) {
+          length = headObject.ContentLength;
+        }
+        if (headObject.ETag) {
+          md5 = headObject.ETag;
+        }
+        if (headObject['x-amz-version-id']) {
+          version = headObject['x-amz-version-id'];
+        }
       }
-    }
+      let tags: Attribute[] = [];
+      let tagObj: Attribute;
+      if (objectTagging) {
+        // transform received object to respect our own defined structure
+        let receivedTags = objectTagging.TagSet;
 
-    const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5, tags };
+        for (let i = 0; i < receivedTags.length; i++) {
+          tagObj = {
+            id: receivedTags[i].Key,
+            value: receivedTags[i].Value
+          };
+          tags.push(tagObj);
+        }
+      }
+
+      const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5, tags };
 
 
-    // Make ACS request with the meta object read from storage
-    if (!subject) {
-      subject = {};
-    }
-    if (metaObj.owner && metaObj.owner[1]) {
-      subject.scope = metaObj.owner[1].value;
-    }
-    subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
-    let resource = { key, bucket, meta: metaObj };
-    let acsResponse: AccessResponse;
-    try {
-      // target entity for ACS is bucket name here
-      acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
-        bucket, this);
-    } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
-      return await call.end(err);
-    }
-    if (acsResponse.decision != Decision.PERMIT) {
-      const err = new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
-      return await call.end(err);
-    }
+      // Make ACS request with the meta object read from storage
+      if (!subject) {
+        subject = {};
+      }
+      if (metaObj.owner && metaObj.owner[1]) {
+        subject.scope = metaObj.owner[1].value;
+      }
+      subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
+      let resource = { key, bucket, meta: metaObj };
+      let acsResponse: AccessResponse;
+      try {
+        // target entity for ACS is bucket name here
+        acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
+          bucket, this);
+      } catch (err) {
+        this.logger.error('Error occurred requesting access-control-srv:', err);
+        return await call.end(err);
+      }
+      if (acsResponse.decision != Decision.PERMIT) {
+        const err = new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+        return await call.end(err);
+      }
 
-    this.logger.verbose(`Received a request to get object ${key} on bucket ${bucket}`);
+      this.logger.info(`Received a request to get object ${key} on bucket ${bucket}`);
 
-    // retrieve object from Amazon S3
-    // and create stream from it
-    const stream = new MemoryStream(null);
-    const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
-    stream.pipe(downloadable);
-    // write data to gRPC call
-    await new Promise<any>((resolve, reject) => {
-      downloadable
-        .on('httpData', async (chunk) => {
-          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
-        })
-        .on('data', async (chunk) => {
-          await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
-        })
-        .on('httpDone', async () => {
-          resolve();
-        })
-        .on('end', async (chunk) => {
-          await call.end();
-          resolve();
-        })
-        .on('finish', async (chunk) => {
-          await call.end();
-          resolve();
-        })
-        .on('httpError', async (err: any) => {
-          this.logger.error('HTTP error occurred while getting object', { err });
-          // map the s3 error codes to standard chassis-srv errors
-          if (err.code === 'NotFound') {
-            err = new errors.NotFound('The specified key was not found');
-            err.code = 404;
-          }
-          await call.end(err);
-        })
-        .on('error', async (err: any) => {
-          this.logger.error('Error occurred while getting object', { err });
-          // map the s3 error codes to standard chassis-srv errors
-          if (err.code === 'NotFound') {
-            err = new errors.NotFound('The specified key was not found');
-            err.code = 404;
-          }
-          await call.end(err);
-        });
-    });
-    return;
+      // retrieve object from Amazon S3
+      // and create stream from it
+      const stream = new MemoryStream(null);
+      const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
+      stream.pipe(downloadable);
+
+      // write data to gRPC call
+      await new Promise<any>((resolve, reject) => {
+        downloadable
+          .on('httpData', async (chunk) => {
+            await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
+          })
+          .on('data', async (chunk) => {
+            await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
+          })
+          .on('httpDone', async () => {
+            resolve();
+          })
+          .on('end', async (chunk) => {
+            await call.end();
+            resolve();
+          })
+          .on('finish', async (chunk) => {
+            await call.end();
+            resolve();
+          })
+          .on('httpError', async (err: any) => {
+            if (err.code === 'NotFound') {
+              err = new errors.NotFound('The specified key was not found');
+              err.code = 404;
+            }
+            // map the s3 error codes to standard chassis-srv errors
+            this.logger.error('HTTP error occurred while getting object',
+              {
+                Key: key, error: err, errorStack: err.stack
+              });
+            await call.end(err);
+            return reject(err);
+          })
+          .on('error', async (err: any) => {
+            // map the s3 error codes to standard chassis-srv errors
+            if (err.code === 'NotFound') {
+              err = new errors.NotFound('The specified key was not found');
+              err.code = 404;
+            }
+            this.logger.error('Error occurred while getting object',
+              {
+                Key: key, error: err, errorStack: err.stack
+              });
+            await call.end(err);
+            return reject(err);
+          });
+      });
+      return;
+    }
   }
 
-  /**
+/**
  * creates meta object containing owner information
  * @param reaources resource
  * @param orgKey orgKey
@@ -634,60 +554,76 @@ export class Service {
     let stream = true;
     let completeBuffer = [];
     let key, bucket, meta, object, options, subject, api_key;
+
     while (stream) {
       try {
-        let req = await call.read();
+        let streamRequest = await call.read();
         // Promisify callback to get response
-        req = await new Promise((resolve, reject) => {
-          req((err, response) => {
+        const streamResponse: any = await new Promise((resolve, reject) => {
+          streamRequest((err, response) => {
             if (err) {
               reject(err);
             }
             resolve(response);
           });
         });
-        bucket = req.bucket;
-        key = req.key;
-        meta = req.meta;
-        object = req.object;
-        options = req.options;
-        subject = req.subject;
-        api_key = req.api_key;
+        bucket = streamResponse.bucket;
+        key = streamResponse.key;
+        meta = streamResponse.meta;
+        object = streamResponse.object;
+        options = streamResponse.options;
+        subject = streamResponse.subject;
+        api_key = streamResponse.api_key;
+        // check object name
+        if (!this.IsValidObjectName(key)) {
+          stream = false;
+          throw new errors.InvalidArgument(`Invalid Object name ${key}`);
+        }
         if (!_.includes(this.buckets, bucket)) {
           stream = false;
-          throw new InvalidBucketName(bucket);
+          throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
         }
+
         completeBuffer.push(object);
       } catch (e) {
         stream = false;
-        if (e.message === 'stream end') {
-          subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
-          let resource = { key, bucket, meta, options };
-          this.createMetadata(resource, subject);
-          // created meta if it was not provided in request
-          meta = resource.meta;
-          let acsResponse: AccessResponse;
-          try {
-            // target entity for ACS is bucket name here
-            acsResponse = await checkAccessRequest(subject, resource, AuthZAction.CREATE,
-              bucket, this);
-          } catch (err) {
-            this.logger.error('Error occurred requesting access-control-srv:', err);
-            throw err;
-          }
-          if (acsResponse.decision != Decision.PERMIT) {
-            throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
-          }
-          // store object to storage server using streaming connection
-          const response = await this.storeObject(
-            key,
-            bucket,
-            Buffer.concat(completeBuffer), // object
-            meta,
-            options
-          );
-          return response;
+        if (e.message != 'stream end') {
+          this.logger.error('Error occurred while storing object...', e);
+          throw e;
         }
+      }
+    }
+    if (!stream) {
+      let response;
+      try {
+        subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
+        let resource = { key, bucket, meta, options };
+        this.createMetadata(resource, subject);
+        // created meta if it was not provided in request
+        meta = resource.meta;
+        let acsResponse: AccessResponse;
+        try {
+          // target entity for ACS is bucket name here
+          acsResponse = await checkAccessRequest(subject, resource, AuthZAction.CREATE,
+            bucket, this);
+        } catch (err) {
+          this.logger.error('Error occurred requesting access-control-srv:', err);
+          throw err;
+        }
+        if (acsResponse.decision != Decision.PERMIT) {
+          throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+        }
+        response = await this.storeObject(
+          key,
+          bucket,
+          Buffer.concat(completeBuffer), // object
+          meta,
+          options
+        );
+        return response;
+      } catch (e) {
+        this.logger.error('Error occurred while storing object.', e);
+        throw e; // if you throw without a catch block you get an error
       }
     }
   }
@@ -939,18 +875,15 @@ export class Service {
   // Regular expression that checks if the filename string contains
   // only characters described as safe to use in the Amazon S3
   // Object Key Naming Guidelines
-  private isValidObjectName(key: string): boolean {
+  private IsValidObjectName(key: string): boolean {
     const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()/]+$');
     return (allowedCharacters.test(key));
   }
 
   private async storeObject(key: string, bucket: string, object: any, meta: any, options: Options): Promise<PutResponse> {
-    this.logger.verbose(`Received a request to store Object ${key} on bucket ${bucket}`);
-    if (!this.isValidObjectName(key)) {
-      throw new IsValidObjectName(key);
-    }
-
+    this.logger.info('Received a request to store Object:', { Key: key, Bucket: bucket });
     try {
+
       let metaData = {
         meta: JSON.stringify(meta),
         key,
@@ -996,29 +929,52 @@ export class Service {
         ContentLanguage: options.content_language,
         ContentDisposition: options.content_disposition,
         Tagging: TaggingQueryParams // this param looks like 'key1=val1&key2=val2'
-      }, (error, data) => { });
+      }, (err, data) => {
+        if (err) {
+          this.logger.error('Error occurred while storing object',
+            {
+              Key: key, Bucket: bucket, error: err, errStack: err.stack
+            });
+          throw err;
+        } else {
+          return data;
+        }
+      });
       readable.pipe(passStream);
 
       const output = await new Promise<any>((resolve, reject) => {
-        uploadable
-          .on('httpUploadProgress', (chunk) => {
-            if (chunk.loaded == chunk.total) {
-              this.logger.info(`Successfully persisted object ${key}
-                            in bucket ${bucket}`);
-              resolve(true);
-            }
-          })
-          .send();
+        uploadable.send((err, data) => {
+          if (err) {
+            this.logger.error('Error:', err.code, err.message);
+            reject(err);
+          } else {
+            resolve(data);
+          }
+        });
+        uploadable.on('httpUploadProgress', (chunk) => {
+          if (chunk.loaded == chunk.total) {
+            this.logger.info(`Successfully persisted object ${key}
+                        in bucket ${bucket}`);
+            resolve(true);
+          }
+        });
       });
       if (output) {
         const url = `//${bucket}/${key}`;
         const tags = options && options.tags;
-        const response = { url, key, bucket, meta, tags, length };
-        return response;
+        return { key, bucket, url, meta, tags, length };
+      } else {
+        this.logger.error('No output returned when trying to store object',
+          {
+            Key: key, Bucket: bucket
+          });
       }
     } catch (err) {
-      this.logger.error('Error occurred when storing Object:', { err });
-      throw err;
+      this.logger.error('Error occurred while storing object',
+        {
+          Key: key, Bucket: bucket, error: err, errStack: err.stack
+        });
+      return (err);
     }
   }
 
@@ -1026,10 +982,10 @@ export class Service {
     const { bucket, key } = call.request;
     let subject = await getSubjectFromRedis(call.request.subject, call.request.api_key, this.redisClient);
     if (!_.includes(this.buckets, bucket)) {
-      throw new InvalidBucketName(bucket);
+      throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
     }
 
-    this.logger.verbose(`Received a request to delete object ${key} on bucket ${bucket}`);
+    this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
     const objectsList = await this.list(call);
     let objectExists = false;
     for (let object of objectsList) {
@@ -1039,7 +995,7 @@ export class Service {
       }
     }
     if (!objectExists) {
-      throw new InvalidKey(key);
+      throw new errors.InvalidArgument('Invalid key name');
     }
 
     let headObject: any;

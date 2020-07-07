@@ -33,8 +33,8 @@ The time is always midnight UTC (e.g. '2019-05-30T00:00:00.000Z').
 - https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json#L38[`Rules.Expiration.Days`]: the number
 of days since object creation when the expiration will occur (e.g. 30).
 Amazon S3 calculates the time by adding the number of days specified in the rule to the object creation time and
-rounding the resulting time to the next day midnight UTC. For example, if an object was created at '1/15/2014 10:30 AM UTC'
-and you specify 3 days in a transition rule, then the transition date of the object would be calculated as '1/19/2014 00:00 UTC'.
+rounding the resulting time to the next day midnight UTC. For example, if an object was created at 1/15/2014 10:30 AM UTC
+and you specify 3 days in a transition rule, then the transition date of the object would be calculated as 1/19/2014 00:00 UTC.
 - https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json#L24[`Rules.Filter.Prefix`]: filtering
 based on prefix identifying one or more objects (files or folders) to which the rule applies
 (e.g. 'temp/' expires all objects under 'temp' folder).
@@ -246,4 +246,4 @@ This microservice subscribes to the following events by topic:
 |                              | `versionCommand` | to get system version
 |==========================================================================================================================================
 
-**Note**: currently restore and reset are not implemented.
+**Note**: currently restore and reset is not implemented.
