@@ -5,8 +5,7 @@ import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as sconfig from '@restorecommerce/service-config';
 import * as sleep from 'sleep';
 import * as fs from 'fs';
-import { updateConfig } from '@restorecommerce/acs-client';
-import { startGrpcMockServer, bucketPolicySetRQ, stopGrpcMockServer } from './utils';
+import { startGrpcMockServer, bucketPolicySetRQ, stopGrpcMockServer, permitCreateObjRule, denyCreateObjRule } from './utils';
 
 const Events = kafkaClient.Events;
 
@@ -32,7 +31,7 @@ let meta = {
   modified_by: 'SYSTEM',
   owner: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
-    value: 'urn:restorecommerce:acs:model:user.User'
+    value: 'urn:restorecommerce:acs:model:organization.Organization'
   },
   {
     id: 'urn:restorecommerce:acs:names:ownerInstance',
@@ -62,6 +61,268 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> {
   return service;
 }
 
+describe('testing ostorage-srv with ACS enabled', () => {
+  let mockServer: any;
+  before(async function startServer(): Promise<void> {
+    // ACS is enabled in config by default
+    await start();
+  });
+
+  after(async function stopServer(): Promise<void> {
+    await stop();
+    stopGrpcMockServer(mockServer, logger);
+  });
+  let subject;
+  // mainOrg -> orgA -> orgB -> orgC
+  const acsSubject = {
+    id: 'admin_user_id',
+    scope: 'orgC',
+    role_associations: [
+      {
+        role: 'admin-r-id',
+        attributes: [{
+          id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+          value: 'urn:restorecommerce:acs:model:organization.Organization'
+        },
+        {
+          id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+          value: 'mainOrg'
+        }]
+      }
+    ],
+    hierarchical_scopes: [
+      {
+        id: 'mainOrg',
+        role: 'admin-r-id',
+        children: [{
+          id: 'orgA',
+          children: [{
+            id: 'orgB',
+            children: [{
+              id: 'orgC'
+            }]
+          }]
+        }]
+      }
+    ]
+  };
+
+  describe('Object Storage with ACS enabled', () => {
+    it('With valid subject scope should store the data to storage server using request streaming and then delete the object', async () => {
+      // strat acs mock service
+      await connect('grpc-client:service-ostorage', '');
+      // PERMIT mock
+      bucketPolicySetRQ.policy_sets[0].policies[0].rules = [permitCreateObjRule];
+      bucketPolicySetRQ.policy_sets[0].policies[0].effect = 'PERMIT';
+      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
+      { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }], logger);
+      let response, putResponse;
+      subject = acsSubject;
+      // create streaming client request
+      const clientConfig = cfg.get('grpc-client:service-ostorage');
+      const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
+      const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
+      const call = await put();
+      const readStream = fs.createReadStream('./test/cfg/config.json');
+      readStream.on('data', async (chunk) => {
+        const data = {
+          bucket: 'test',
+          key: 'config_acs_enabled.json',
+          object: chunk,
+          meta,
+          options,
+          subject
+        };
+        await call.write(data);
+      });
+
+      response = await new Promise(async (resolve, reject) => {
+        readStream.on('end', async () => {
+          putResponse = await call.end((err, data) => { });
+          response = await new Promise((resolve, reject) => {
+            putResponse((err, data) => {
+              resolve(data);
+            });
+          });
+          resolve(response);
+          return response;
+        });
+      });
+      should(response.error).null;
+      should.exist(response.bucket);
+      should.exist(response.key);
+      should.exist(response.url);
+      response.key.should.equal('config_acs_enabled.json');
+      response.bucket.should.equal('test');
+      response.url.should.equal('//test/config_acs_enabled.json');
+    });
+    it('With valid subject scope should be able to read the object', async () => {
+      // create streaming client request
+      const clientConfig = cfg.get('grpc-client:service-ostorage');
+      const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
+      const get = client.makeEndpoint('get', clientConfig.publisher.instances[0]);
+      const call = await get({
+        key: 'config_acs_enabled.json',
+        bucket: 'test',
+        subject
+      });
+      let result;
+      result = await call.read();
+      result = await new Promise((resolve, reject) => {
+        result((err, response) => {
+          if (err) {
+            reject(err);
+          }
+          resolve(response);
+        });
+      });
+      should.exist(result);
+      should.exist(result.key);
+      should.exist(result.url);
+      should.exist(result.object);
+      result.url.should.equal('//test/config_acs_enabled.json');
+      meta.owner.should.deepEqual(result.meta.owner);
+      sleep.sleep(3);
+    });
+    it('With valid subject scope should be able to list the object', async () => {
+      oStorage = await connect('grpc-client:service-ostorage', '');
+      let result = await oStorage.list({ subject });
+      should.exist(result.data);
+      should.exist(result.data.object_data);
+      result.data.object_data.length.should.equal(1);
+    });
+    it('With invalid subject scope should throw an error when storing object', async () => {
+      // stop and restart acs mock service for DENY
+      await stopGrpcMockServer(mockServer, logger);
+      // DENY mock
+      bucketPolicySetRQ.policy_sets[0].policies[0].rules = [denyCreateObjRule];
+      bucketPolicySetRQ.policy_sets[0].policies[0].effect = 'PERMIT';
+      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
+      { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'DENY' } }], logger);
+      let response, putResponse;
+      subject = acsSubject;
+      subject.scope = 'orgD'; // set scope to invalid value which does not exist in user HR scope
+      // create streaming client request
+      const clientConfig = cfg.get('grpc-client:service-ostorage');
+      const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
+      const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
+      const call = await put();
+      const readStream = fs.createReadStream('./test/cfg/config.json');
+      readStream.on('data', async (chunk) => {
+        const data = {
+          bucket: 'test',
+          key: 'config_invalid_scope',
+          object: chunk,
+          meta,
+          options,
+          subject
+        };
+        await call.write(data);
+      });
+
+      response = await new Promise(async (resolve, reject) => {
+        readStream.on('end', async () => {
+          putResponse = await call.end((err, data) => { });
+          response = await new Promise((resolve, reject) => {
+            putResponse((err, data) => {
+              const errResponse = {
+                error: {
+                  code: err.code,
+                  message: err.details || err.message
+                }
+              };
+              resolve(errResponse);
+            });
+          });
+          resolve(response);
+          return response;
+        });
+      });
+      should.exist(response.error);
+      response.error.message.should.equal('Access not allowed for request with subject:admin_user_id, resource:test, action:CREATE, target_scope:orgD; the response was DENY');
+      sleep.sleep(3);
+    });
+
+    it('With invalid subject scope should throw an error when reading object', async () => {
+      const clientConfig = cfg.get('grpc-client:service-ostorage');
+      const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
+      const get = client.makeEndpoint('get', clientConfig.publisher.instances[0]);
+      const call = await get({
+        key: 'config_acs_enabled.json',
+        bucket: 'test',
+        subject
+      });
+      let streamResponse = true;
+      let streamData = {
+        key: '', object: {}, url: '', error: { code: null, message: null }
+      };
+      let streamBuffer = [];
+      let result;
+      try {
+        while (streamResponse) {
+          result = await call.read();
+          result = await new Promise((resolve, reject) => {
+            result((err, response) => {
+              if (err) {
+                reject(err);
+              }
+              resolve(response);
+            });
+          });
+          streamData.key = result.key;
+          streamData.url = result.url;
+          if (result.error) {
+            streamData.error = result.error;
+          }
+          streamBuffer.push(result.object);
+        }
+      } catch (err) {
+        should.exist(err.details);
+        err.details.should.equal('Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgC; the response was DENY');
+      }
+      sleep.sleep(3);
+    });
+    it('With invalid subject scope should throw an error when listing object', async () => {
+      let result = await oStorage.list({
+        bucket: 'test',
+        subject
+      });
+      should.exist(result.error);
+      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgD; the response was DENY');
+      sleep.sleep(3);
+    });
+    it('With invalid subject scope should throw an error when deleting object', async () => {
+      let result = await oStorage.delete({
+        bucket: 'test',
+        key: 'config_acs_enabled.json',
+        subject
+      });
+      // NOTE: before deleting the object is read to make sure it exists, so we get a read error
+      should.exist(result.error);
+      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgD; the response was DENY');
+      sleep.sleep(3);
+    });
+    it('With valid subject scope should delete the object', async () => {
+      subject.scope = 'orgC';
+      await stopGrpcMockServer(mockServer, logger);
+      // PERMIT mock
+      bucketPolicySetRQ.policy_sets[0].policies[0].rules = [permitCreateObjRule];
+      bucketPolicySetRQ.policy_sets[0].policies[0].effect = 'PERMIT';
+      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
+      { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }], logger);
+
+      let result = await oStorage.delete({
+        bucket: 'test',
+        key: 'config_acs_enabled.json',
+        subject
+      });
+      should(result.error).null;
+      should(result.data).empty;
+      await stopGrpcMockServer(mockServer, logger);
+    });
+  });
+});
+
 describe('testing ostorage-srv with ACS disabled', () => {
   before(async function startServer(): Promise<void> {
     await start();
@@ -77,7 +338,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
     it('Should be empty initially', async () => {
       oStorage = await connect('grpc-client:service-ostorage', '');
       let result = await oStorage.list();
-      should(result.data.file_information).empty;
+      should(result.data.object_data).empty;
     });
     it('Should store the data to storage server using request streaming', async () => {
       let response;
@@ -217,156 +478,6 @@ describe('testing ostorage-srv with ACS disabled', () => {
       });
       should(result.error).null;
       should(result.data).empty;
-    });
-  });
-});
-
-describe('testing ostorage-srv with ACS enabled', () => {
-  let mockServer: any;
-  before(async function startServer(): Promise<void> {
-    // ACS is enabled in config
-    await start();
-  });
-
-  after(async function stopServer(): Promise<void> {
-    await stop();
-    stopGrpcMockServer(mockServer, logger);
-  });
-  let subject;
-  // mainOrg -> orgA -> orgB -> orgC
-  const acsSubject = {
-    id: 'admin_user_id',
-    scope: 'orgC',
-    role_associations: [
-      {
-        role: 'admin-r-id',
-        attributes: [{
-          id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-          value: 'urn:restorecommerce:acs:model:organization.Organization'
-        },
-        {
-          id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-          value: 'mainOrg'
-        }]
-      }
-    ],
-    hierarchical_scopes: [
-      {
-        id: 'mainOrg',
-        role: 'admin-r-id',
-        children: [{
-          id: 'orgA',
-          children: [{
-            id: 'orgB',
-            children: [{
-              id: 'orgC'
-            }]
-          }]
-        }]
-      }
-    ]
-  };
-
-  describe('Object Storage with ACS enabled', () => {
-    it('With valid Subject scope Should store the data to storage server using request streaming', async () => {
-      // strat acs mock service
-      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
-      { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }], logger);
-      let response;
-      subject = acsSubject;
-      // create streaming client request
-      const clientConfig = cfg.get('grpc-client:service-ostorage');
-      const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
-      const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
-      console.log('Calling put with valid scope...');
-      const call = await put();
-      const readStream = fs.createReadStream('./test/cfg/config.json');
-      readStream.on('data', async (chunk) => {
-        const data = {
-          bucket: 'test',
-          key: 'config.json',
-          object: chunk,
-          // meta,
-          options,
-          subject
-        };
-        await call.write(data);
-      });
-
-      response = await new Promise(async (resolve, reject) => {
-        readStream.on('end', async () => {
-          response = await call.end((err, data) => { });
-          response = await new Promise((resolve, reject) => {
-            response((err, data) => {
-              resolve(data);
-            });
-          });
-          resolve(response);
-          return response;
-        });
-      });
-      should(response.error).null;
-      should.exist(response.bucket);
-      should.exist(response.key);
-      should.exist(response.url);
-      response.key.should.equal('config.json');
-      response.bucket.should.equal('test');
-      response.url.should.equal('//test/config.json');
-      sleep.sleep(3);
-      stopGrpcMockServer(mockServer, logger);
-    });
-    it('With invalid Subject scope Should throw an error when storing object', async () => {
-      // strat acs mock service
-      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
-      { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'DENY' } }], logger);
-      let response;
-      subject = acsSubject;
-      subject.scope = 'orgD'; // set scope to invalid value which does not exist in user HR scope
-      // create streaming client request
-      const clientConfig = cfg.get('grpc-client:service-ostorage');
-      const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
-      const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
-      console.log('Calling PUt with invalid scope...');
-      const call = await put();
-      const readStream = fs.createReadStream('./test/cfg/config.json');
-      readStream.on('data', async (chunk) => {
-        const data = {
-          bucket: 'test',
-          key: 'config.json',
-          object: chunk,
-          // meta,
-          options,
-          subject
-        };
-        await call.write(data);
-      });
-
-      try {
-        response = await new Promise(async (resolve, reject) => {
-          readStream.on('end', async () => {
-            response = await call.end((err, data) => { });
-            response = await new Promise((resolve, reject) => {
-              response((err, data) => {
-                resolve(data);
-              });
-            });
-            resolve(response);
-            return response;
-          });
-        });
-      } catch(err) {
-        console.log('Error caught..', err);
-      }
-      // console.log('Resp is...', JSON.stringify(response));
-      // should(response.error).null;
-      // should.exist(response.bucket);
-      // should.exist(response.key);
-      // should.exist(response.url);
-      // response.key.should.equal('config.json');
-      // response.bucket.should.equal('test');
-      // response.url.should.equal('//test/config.json');
-      sleep.sleep(3);
-      stopGrpcMockServer(mockServer, logger);
     });
   });
 });

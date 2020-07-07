@@ -52,8 +52,8 @@ export const bucketPolicySetRQ = {
               value: 'urn:restorecommerce:acs:model:test.Test'
             }],
             subject: []
-          }, effect: 'PERMIT',
-          rules: [permitCreateObjRule, denyCreateObjRule],
+          }, effect: '',
+          rules: [],
           has_rules: true
         }]
     }]

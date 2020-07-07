@@ -296,5 +296,19 @@
         "whatIsAllowed": {}
       }
     }
+  },
+  "errors": {
+    "INVALID_CREDENTIALS": {
+      "code": "401",
+      "message": "Invalid credentials"
+    },
+    "USER_NOT_LOGGED_IN": {
+      "code": "401",
+      "message": "Invalid authentication context, please log in first"
+    },
+    "ACTION_NOT_ALLOWED": {
+      "code": "403",
+      "message": "Action not allowed on this resource"
+    }
   }
 }

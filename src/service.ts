@@ -335,7 +335,6 @@ export class Service {
     if (acsResponse.decision != Decision.PERMIT) {
       throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
-
     const customArgs = resource.custom_arguments;
     const ownerIndictaorEntURN = this.cfg.get('authorization:urns:ownerIndicatoryEntity');
     const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
@@ -398,16 +397,18 @@ export class Service {
               // then its considred a match for further filtering based on filter field if it exists
               let match = false;
               let ownerInst;
-              for (let idVal of objectMeta) {
-                if (idVal.id === ownerIndictaorEntURN && idVal.value === ownerIndicatorEntity) {
-                  match = true;
+              if (objectMeta.owner) {
+                for (let idVal of objectMeta.owner) {
+                  if (idVal.id === ownerIndictaorEntURN && idVal.value === ownerIndicatorEntity) {
+                    match = true;
+                  }
+                  if (idVal.id === ownerInstanceURN) {
+                    ownerInst = idVal.value;
+                  }
                 }
-                if (idVal.id === ownerInstanceURN) {
-                  ownerInst = idVal.value;
+                if (match && ownerInst && ownerValues.includes(ownerInst)) {
+                  this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
                 }
-              }
-              if (match && ownerInst && ownerValues.includes(ownerInst)) {
-                this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
               }
             } else {
               this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
@@ -540,10 +541,11 @@ export class Service {
         bucket, this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return await call.end(err);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      const err = new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return await call.end(err);
     }
 
     this.logger.verbose(`Received a request to get object ${key} on bucket ${bucket}`);
@@ -662,6 +664,8 @@ export class Service {
           subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
           let resource = { key, bucket, meta, options };
           this.createMetadata(resource, subject);
+          // created meta if it was not provided in request
+          meta = resource.meta;
           let acsResponse: AccessResponse;
           try {
             // target entity for ACS is bucket name here
