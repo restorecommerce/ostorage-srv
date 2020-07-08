@@ -252,7 +252,6 @@ describe('testing ostorage-srv with ACS enabled', () => {
       response.error.message.should.equal('Access not allowed for request with subject:admin_user_id, resource:test, action:CREATE, target_scope:orgD; the response was DENY');
       sleep.sleep(3);
     });
-
     it('With invalid subject scope should throw an error when reading object', async () => {
       const clientConfig = cfg.get('grpc-client:service-ostorage');
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
@@ -312,15 +311,86 @@ describe('testing ostorage-srv with ACS enabled', () => {
       result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgD; the response was DENY');
       sleep.sleep(3);
     });
-    it('With valid subject scope should delete the object', async () => {
-      subject.scope = 'orgC';
+    it('With invalid scope should throw an error when replacing the object', async () => {
+      // create streaming client request
+      const data = {
+        items: {
+          bucket: 'test',
+          copySource: 'test/config_acs_enabled.json',
+          key: 'config_copy.json',
+          meta: meta,
+          options: {
+            encoding: 'gzip',
+            content_type: 'text/html',
+            content_language: 'de-DE',
+            content_disposition: 'form-data',
+            tags: [
+              {
+                id: 'id_1',
+                value: 'value_1'
+              }
+            ]
+          }
+        },
+        subject // invalid subject scope containg 'orgD'
+      };
+      const result = await oStorage.copy(data);
+      should.exist(result.error);
+      should.exist(result.error.details);
+      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgC; the response was DENY');
+      sleep.sleep(3);
+    });
+    it('With valid scope should replace the object', async () => {
+      subject.scope = 'orgC'; // setting valid subject scope
       await stopGrpcMockServer(mockServer, logger);
       // PERMIT mock
       bucketPolicySetRQ.policy_sets[0].policies[0].rules = [permitCreateObjRule];
       bucketPolicySetRQ.policy_sets[0].policies[0].effect = 'PERMIT';
       mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
       { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }], logger);
+      const data = {
+        items: {
+          bucket: 'test',
+          copySource: 'test/config_acs_enabled.json',
+          key: 'config_acs_enabled.json',
+          meta: meta,
+          options: {
+            encoding: 'gzip',
+            content_type: 'text/html',
+            content_language: 'de-DE',
+            content_disposition: 'form-data',
+            tags: [
+              {
+                id: 'id_1',
+                value: 'value_1'
+              }
+            ]
+          }
+        },
+        subject // invalid subject scope containg 'orgD'
+      };
+      const result = await oStorage.copy(data);
+      should(result.error).null;
+      should.exist(result.data);
+      should.exist(result.data.response);
 
+      let response = result.data.response;
+      should.exist(response[0].bucket);
+      should.exist(response[0].copySource);
+      should.exist(response[0].key);
+      should.exist(response[0].meta.owner[1].value);
+      should.exist(response[0].options.encoding);
+      should.exist(response[0].options.tags[0].id);
+
+      response[0].bucket.should.equal('test');
+      response[0].copySource.should.equal('test/config_acs_enabled.json');
+      response[0].key.should.equal('config_acs_enabled.json');
+      response[0].meta.owner.should.deepEqual(meta.owner);
+      response[0].options.encoding.should.equal('gzip');
+      response[0].options.tags[0].id.should.equal('id_1');
+      sleep.sleep(3);
+    });
+    it('With valid subject scope should delete the object', async () => {
       let result = await oStorage.delete({
         bucket: 'test',
         key: 'config_acs_enabled.json',
@@ -443,11 +513,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       response.url.should.equal('//test/config.json');
 
       // check meta
-      response.meta.modified_by.should.equal('SYSTEM');
-      response.meta.owner[0].id.should.equal('urn:restorecommerce:acs:names:ownerIndicatoryEntity');
-      response.meta.owner[0].value.should.equal('urn:restorecommerce:acs:model:organization.Organization');
-      response.meta.owner[1].id.should.equal('urn:restorecommerce:acs:names:ownerInstance');
-      response.meta.owner[1].value.should.equal('orgC');
+      response.meta.owner.should.deepEqual(meta.owner);
 
       // check tags
       response.tags[0].id.should.equal('id_1');
@@ -573,7 +639,6 @@ describe('testing ostorage-srv with ACS disabled', () => {
               {
                 id: 'id_1',
                 value: 'value_1'
-
               }
             ]
           }
