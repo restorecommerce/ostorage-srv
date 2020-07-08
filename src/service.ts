@@ -638,6 +638,12 @@ export class Service {
     let grpcResponse: CopyResponseList = { response: [] };
     let copyObjectResult;
 
+    let subject = call.request.subject;
+    let api_key = call.request.api_key;
+    let destinationSubjectScope; // scope for destination bucket
+    if (subject && subject.scope) {
+      destinationSubjectScope = subject.scope;
+    }
     if (request && request.items) {
       const itemsList = request.items;
       for (const item of itemsList) {
@@ -649,7 +655,10 @@ export class Service {
 
         // Regex to extract bucket name and key from copySource
         // ex: copySource= /bucketName/sample-directory/objectName.txt
-        let copySourceStr = copySource.slice(1, copySource.length);
+        let copySourceStr = copySource;
+        if (copySource.startsWith('/')) {
+          copySourceStr = copySource.slice(1, copySource.length);
+        }
         const sourceBucketName = copySourceStr.substring(0, copySourceStr.indexOf('/'));
         const sourceKeyName = copySourceStr.substr(copySourceStr.indexOf('/'), copySourceStr.length);
 
@@ -660,6 +669,55 @@ export class Service {
           Key: key
         };
 
+        const headObjectParams = { Bucket: sourceBucketName, Key: sourceKeyName };
+        const headObject: any = await new Promise((resolve, reject) => {
+          this.ossClient.headObject(headObjectParams, (err, data) => {
+            if (err) {
+              this.logger.error('Error occurred while retrieving metadata for object:',
+                {
+                  Bucket: sourceBucketName, Key: sourceKeyName, error: err, errorStack: err.stack
+                });
+              reject(err);
+            } else {
+              resolve(data);
+            }
+          });
+        });
+        let metaObj;
+        if (headObject && headObject.Metadata && headObject.Metadata.meta) {
+          metaObj = JSON.parse(headObject.Metadata.meta);
+        }
+        if (!subject) {
+          subject = {};
+        }
+        if (metaObj.owner && metaObj.owner[1]) {
+          // modifying the scope to check for read operation
+          subject.scope = metaObj.owner[1].value;
+        }
+        subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
+
+        // ACS read request check for source Key READ and CREATE action request check for destination Bucket
+        let resource = { key, sourceBucketName, meta: metaObj };
+        let acsResponse: AccessResponse;
+        try {
+          // target entity for ACS is source bucket here
+          acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
+            sourceBucketName, this);
+        } catch (err) {
+          this.logger.error('Error occurred requesting access-control-srv:', err);
+          throw err;
+        }
+        if (acsResponse.decision != Decision.PERMIT) {
+          throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+        }
+
+        // check write access to destination bucket
+        subject.scope = destinationSubjectScope;
+        // target entity for ACS is destination bucket here
+        let writeAccessResponse = await checkAccessRequest(subject, item, AuthZAction.CREATE, bucket, this);
+        if (writeAccessResponse.decision != Decision.PERMIT) {
+          throw new PermissionDenied(writeAccessResponse.response.status.message, writeAccessResponse.response.status.code);
+        }
         // need to iterate and check if there is at least one key set
         // since the gRPC adds default values for missing fields
         let optionsExist = false;
@@ -762,38 +820,22 @@ export class Service {
           }
 
           // 2. Add Object metadata
-          // Get the source object's metadata and add it to our copied object
-          const headObjectParams = { Bucket: sourceBucketName, Key: sourceKeyName };
-          const objectMeta: any = await new Promise((resolve, reject) => {
-            this.ossClient.headObject(headObjectParams, (err, data) => {
-              if (err) {
-                this.logger.error('Error occurred while retrieving metadata for object:',
-                  {
-                    Bucket: sourceBucketName, Key: sourceKeyName, error: err, errorStack: err.stack
-                  });
-                reject(err);
-              } else {
-                resolve(data);
-              }
-            });
-          });
-
-          if (objectMeta) {
+          if (headObject) {
             // ContentEncoding
-            if (objectMeta.ContentEncoding && !_.isEmpty(objectMeta.ContentEncoding)) {
-              params.ContentEncoding = objectMeta.ContentEncoding;
+            if (headObject.ContentEncoding && !_.isEmpty(headObject.ContentEncoding)) {
+              params.ContentEncoding = headObject.ContentEncoding;
             }
             // ContentType
-            if (objectMeta.ContentType && !_.isEmpty(objectMeta.ContentType)) {
-              params.ContentType = objectMeta.ContentType;
+            if (headObject.ContentType && !_.isEmpty(headObject.ContentType)) {
+              params.ContentType = headObject.ContentType;
             }
             // ContentLanguage
-            if (objectMeta.ContentLanguage && !_.isEmpty(objectMeta.ContentLanguage)) {
-              params.ContentLanguage = objectMeta.ContentLanguage;
+            if (headObject.ContentLanguage && !_.isEmpty(headObject.ContentLanguage)) {
+              params.ContentLanguage = headObject.ContentLanguage;
             }
             // ContentDisposition
-            if (objectMeta.ContentDisposition && !_.isEmpty(objectMeta.ContentDisposition)) {
-              params.ContentDisposition = objectMeta.ContentDisposition;
+            if (headObject.ContentDisposition && !_.isEmpty(headObject.ContentDisposition)) {
+              params.ContentDisposition = headObject.ContentDisposition;
             }
           }
 

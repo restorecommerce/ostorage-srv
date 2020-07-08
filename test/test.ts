@@ -443,8 +443,6 @@ describe('testing ostorage-srv with ACS disabled', () => {
       response.url.should.equal('//test/config.json');
 
       // check meta
-      response.meta.created.should.equal(0);
-      response.meta.modified.should.equal(0);
       response.meta.modified_by.should.equal('SYSTEM');
       response.meta.owner[0].id.should.equal('urn:restorecommerce:acs:names:ownerIndicatoryEntity');
       response.meta.owner[0].value.should.equal('urn:restorecommerce:acs:model:organization.Organization');
@@ -458,7 +456,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       response.tags[1].value.should.equal('value_2');
 
       // check length
-      response.length.should.equal(6491);
+      response.length.should.equal(9034);
 
       sleep.sleep(3);
     });
