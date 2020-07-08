@@ -24,7 +24,7 @@
     "@restorecommerce/kafka-client": "^0.1.9",
     "@restorecommerce/logger": "^0.1.16",
     "@restorecommerce/protos": "https://github.com/restorecommerce/protos#protos-acs",
-    "@restorecommerce/resource-base-interface": "^0.0.1",
+    "@restorecommerce/resource-base-interface": "^0.0.3",
     "@restorecommerce/service-config": "^0.1.6",
     "aws-sdk": "^2.656.0",
     "koa-multer": "^1.0.2",
