@@ -11,12 +11,13 @@ A microservice for object storage.
 
 * Abstracting object storage through https://grpc.io/docs/[gRPC].
 * It uses an https://www.npmjs.com/package/aws-sdk[AWS SDK] client for connecting to an object storage framework.
-* This service can be used with an Object Storage Server compatible with the S3 API and this can be configured in link:../../../../cfg/config.json[config.json].
+* This service can be used with an Object Storage Server compatible with the S3 API and this can be configured in
+link:https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json[config.json].
 
 [#configuration]
 == Configuration
 
-The following Object Storage Server configuration properties under the link:../../../../cfg/config.json[`s3`] configuration are available:
+The following Object Storage Server configuration properties under the link:https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json#L2[`s3`] configuration are available:
 
 - `client.accessKeyId`: access key ID for Object Storage Server.
 - `client.secretAccessKey`: secret access key for Object Storage Server.
