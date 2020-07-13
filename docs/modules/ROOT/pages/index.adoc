@@ -11,12 +11,12 @@ A microservice for object storage.
 
 * Abstracting object storage through https://grpc.io/docs/[gRPC].
 * It uses an https://www.npmjs.com/package/aws-sdk[AWS SDK] client for connecting to an object storage framework.
-* This service can be used with an Object Storage Server compatible with the S3 API and this can be configured in link:cfg/config.json[config.json].
+* This service can be used with an Object Storage Server compatible with the S3 API and this can be configured in link:../../../../cfg/config.json[config.json].
 
 [#configuration]
 == Configuration
 
-The following Object Storage Server configuration properties under the link:cfg/config.json[`s3`] configuration are available:
+The following Object Storage Server configuration properties under the link:../../../../cfg/config.json[`s3`] configuration are available:
 
 - `client.accessKeyId`: access key ID for Object Storage Server.
 - `client.secretAccessKey`: secret access key for Object Storage Server.
@@ -33,8 +33,8 @@ The time is always midnight UTC (e.g. '2019-05-30T00:00:00.000Z').
 - https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json#L38[`Rules.Expiration.Days`]: the number
 of days since object creation when the expiration will occur (e.g. 30).
 Amazon S3 calculates the time by adding the number of days specified in the rule to the object creation time and
-rounding the resulting time to the next day midnight UTC. For example, if an object was created at 1/15/2014 10:30 AM UTC
-and you specify 3 days in a transition rule, then the transition date of the object would be calculated as 1/19/2014 00:00 UTC.
+rounding the resulting time to the next day midnight UTC. For example, if an object was created at '1/15/2014 10:30 AM UTC'
+and you specify 3 days in a transition rule, then the transition date of the object would be calculated as '1/19/2014 00:00 UTC'.
 - https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json#L24[`Rules.Filter.Prefix`]: filtering
 based on prefix identifying one or more objects (files or folders) to which the rule applies
 (e.g. 'temp/' expires all objects under 'temp' folder).
@@ -246,4 +246,4 @@ This microservice subscribes to the following events by topic:
 |                              | `versionCommand` | to get system version
 |==========================================================================================================================================
 
-**Note**: currently restore and reset is not implemented.
+**Note**: currently restore and reset are not implemented.

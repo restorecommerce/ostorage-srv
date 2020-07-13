@@ -1,1 +1,21 @@
-* xref:index.adoc[ostorage-srv]
+// INDEX
+* xref:index.adoc[Object Storage Service]
+
+// FEATURES
+* xref:index.adoc#features[Features]
+
+// CONFIGURATION
+* xref:index.adoc#configuration[Configuration]
+
+// API
+* xref:index.adoc#API[API]
+** xref:index.adoc#api_ostorage_put[`Put`]
+** xref:index.adoc#api_ostorage_get[`Get`]
+** xref:index.adoc#api_ostorage_list[`List`]
+** xref:index.adoc#api_ostorage_delete[`Delete`]
+** xref:index.adoc#api_ostorage_copy[`Copy`]
+
+// EVENTS
+* xref:index.adoc#events[Events]
+** xref:index.adoc#emitted-events[Emitted]
+** xref:index.adoc#subscribed-events[Subscribed]
