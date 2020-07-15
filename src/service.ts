@@ -198,7 +198,7 @@ export class Service {
     const ownerIndictaorEntURN = this.cfg.get('authorization:urns:ownerIndicatoryEntity');
     const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
     let customArgsFilter, ownerValues, ownerIndicatorEntity;
-    if (customArgs) {
+    if (customArgs && customArgs.value) {
       customArgsFilter = JSON.parse(customArgs.value.toString());
       // applicable target owner instances
       ownerValues = customArgsFilter.instance;
