@@ -522,9 +522,9 @@ export class Service {
    * @param reaources resource
    * @param orgKey orgKey
    */
-  private createMetadata(resource: any, subject: Subject): Resource {
+  private createMetadata(resource: any, subject: Subject): any {
     let targetScope;
-    if (subject) {
+    if (!_.isEmpty(subject)) {
       targetScope = subject.scope;
     }
     let ownerAttributes = [];
@@ -541,10 +541,10 @@ export class Service {
         });
     }
 
-    if (!resource.meta) {
+    if (_.isEmpty(resource.meta)) {
       resource.meta = {};
     }
-    if (!resource.meta.owner) {
+    if (_.isEmpty(resource.meta.owner)) {
       resource.meta.owner = ownerAttributes;
     }
     return resource;
