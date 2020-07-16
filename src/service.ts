@@ -223,36 +223,54 @@ export class Service {
     for (const value of buckets) {
       if (value != null) {
         let bucketName = { Bucket: value };
-        const objList: any = await new Promise((resolve, reject) => {
-          this.ossClient.listObjectsV2(bucketName, (err, data) => {
-            if (err) {
-              this.logger.error('Error occurred while listing objects',
-                {
-                  bucket: bucketName, error: err, errorStack: err.stack
-                });
-              reject(err);
-            } else {
-              return resolve(data.Contents);
-            }
+        let objList: any;
+        try {
+          objList = await new Promise((resolve, reject) => {
+            this.ossClient.listObjectsV2(bucketName, (err, data) => {
+              if (err) {
+                this.logger.error('Error occurred while listing objects',
+                  {
+                    bucket: bucketName, error: err, errorStack: err.stack
+                  });
+                reject(err);
+              } else {
+                return resolve(data.Contents);
+              }
+            });
           });
-        });
+        } catch (err) {
+          throw err;
+        }
 
         if (objList != null) {
           for (let eachObj of objList) {
             const headObjectParams = { Bucket: value, Key: eachObj.Key };
-            const meta: any = await new Promise((resolve, reject) => {
-              this.ossClient.headObject(headObjectParams, (err, data) => {
-                if (err) {
-                  this.logger.error('Error occurred while reading meta data for objects',
-                    {
-                      bucket: bucketName, error: err, errorStack: err.stack
-                    });
-                  reject(err);
-                } else {
-                  resolve(data.Metadata);
-                }
+            let meta: any;
+            try {
+              meta = await new Promise((resolve, reject) => {
+                this.ossClient.headObject(headObjectParams, (err: any, data) => {
+                  if (err) {
+                    this.logger.error('Error occurred while reading meta data for objects',
+                      {
+                        bucket: bucketName, error: err, errorStack: err.stack
+                      });
+                    // map the s3 error codes to standard chassis-srv errors
+                    if (err.code === 'NotFound') {
+                      err = new errors.NotFound('The specified key was not found');
+                      err.code = 404;
+                    }
+                    if (!err.message) {
+                      err.message = err.name;
+                    }
+                    reject(err);
+                  } else {
+                    resolve(data.Metadata);
+                  }
+                });
               });
-            });
+            } catch (err) {
+              throw err;
+            }
             const url = `//${value}/${meta.key}`;
             const objectName = meta.key;
             let objectMeta;
@@ -670,19 +688,32 @@ export class Service {
         };
 
         const headObjectParams = { Bucket: sourceBucketName, Key: sourceKeyName };
-        const headObject: any = await new Promise((resolve, reject) => {
-          this.ossClient.headObject(headObjectParams, (err, data) => {
-            if (err) {
-              this.logger.error('Error occurred while retrieving metadata for object:',
-                {
-                  Bucket: sourceBucketName, Key: sourceKeyName, error: err, errorStack: err.stack
-                });
-              reject(err);
-            } else {
-              resolve(data);
-            }
+        let headObject: any;
+        try {
+          headObject = await new Promise((resolve, reject) => {
+            this.ossClient.headObject(headObjectParams, (err: any, data) => {
+              if (err) {
+                this.logger.error('Error occurred while retrieving metadata for object:',
+                  {
+                    Bucket: sourceBucketName, Key: sourceKeyName, error: err, errorStack: err.stack
+                  });
+                // map the s3 error codes to standard chassis-srv errors
+                if (err.code === 'NotFound') {
+                  err = new errors.NotFound('The specified key was not found');
+                  err.code = 404;
+                }
+                if (!err.message) {
+                  err.message = err.name;
+                }
+                reject(err);
+              } else {
+                resolve(data);
+              }
+            });
           });
-        });
+        } catch (err) {
+          throw err;
+        }
         let metaObj;
         if (headObject && headObject.Metadata && headObject.Metadata.meta) {
           metaObj = JSON.parse(headObject.Metadata.meta);
@@ -799,25 +830,28 @@ export class Service {
           // End - Compose the copyObject params
 
           // 4. Copy object with new metadata
-          copyObjectResult = await new Promise((resolve, reject) => {
-            this.ossClient.copyObject(params, async (err: any, data) => {
-              if (err) {
-                this.logger.error('Error occurred while copying object:',
-                  {
-                    Bucket: bucket, Key: key, error: err, errorStack: err.stack
+          try {
+            copyObjectResult = await new Promise((resolve, reject) => {
+              this.ossClient.copyObject(params, async (err: any, data) => {
+                if (err) {
+                  this.logger.error('Error occurred while copying object:',
+                    {
+                      Bucket: bucket, Key: key, error: err, errorStack: err.stack
+                    });
+                  reject(err);
+                } else {
+                  const eTag = data.CopyObjectResult.ETag;
+                  const lastModified = data.CopyObjectResult.LastModified;
+                  this.logger.info('Copy object successful!', {
+                    Bucket: bucket, Key: key, ETag: eTag, LastModified: lastModified
                   });
-                reject(err);
-              } else {
-                const eTag = data.CopyObjectResult.ETag;
-                const lastModified = data.CopyObjectResult.LastModified;
-                this.logger.info('Copy object successful!', {
-                  Bucket: bucket, Key: key, ETag: eTag, LastModified: lastModified
-                });
-                resolve(data);
-              }
+                  resolve(data);
+                }
+              });
             });
-          });
-
+          } catch (err) {
+            throw err;
+          }
         } else {
 
           // CASE 2: No options provided => copy the object as it is and update user defined metadata (owner)
@@ -901,24 +935,28 @@ export class Service {
           // End - Compose the copyObject params
 
           // 4. Copy object with new metadata
-          copyObjectResult = await new Promise((resolve, reject) => {
-            this.ossClient.copyObject(params, async (err: any, data) => {
-              if (err) {
-                this.logger.error('Error occurred while copying object:',
-                  {
-                    Bucket: bucket, Key: key, error: err, errorStack: err.stack
+          try {
+            copyObjectResult = await new Promise((resolve, reject) => {
+              this.ossClient.copyObject(params, async (err: any, data) => {
+                if (err) {
+                  this.logger.error('Error occurred while copying object:',
+                    {
+                      Bucket: bucket, Key: key, error: err, errorStack: err.stack
+                    });
+                  reject(err);
+                } else {
+                  const eTag = data.CopyObjectResult.ETag;
+                  const lastModified = data.CopyObjectResult.LastModified;
+                  this.logger.info('Copy object successful!', {
+                    Bucket: bucket, Key: key, ETag: eTag, LastModified: lastModified
                   });
-                reject(err);
-              } else {
-                const eTag = data.CopyObjectResult.ETag;
-                const lastModified = data.CopyObjectResult.LastModified;
-                this.logger.info('Copy object successful!', {
-                  Bucket: bucket, Key: key, ETag: eTag, LastModified: lastModified
-                });
-                resolve(data);
-              }
+                  resolve(data);
+                }
+              });
             });
-          });
+          } catch (err) {
+            throw err;
+          }
         }
 
         if (copyObjectResult) {
@@ -1066,19 +1104,28 @@ export class Service {
 
     let headObject: any;
     let resources = { Bucket: bucket, Key: key };
-    headObject = await new Promise((resolve, reject) => {
-      this.ossClient.headObject(resources, async (err: any, data) => {
-        if (err) {
-          // map the s3 error codes to standard chassis-srv errors
-          if (err.code === 'NotFound') {
-            err = new errors.NotFound('The specified key was not found');
-            err.code = 404;
+    try {
+      headObject = await new Promise((resolve, reject) => {
+        this.ossClient.headObject(resources, async (err: any, data) => {
+          if (err) {
+            this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
+            // map the s3 error codes to standard chassis-srv errors
+            if (err.code === 'NotFound') {
+              err = new errors.NotFound('The specified key was not found');
+              err.code = 404;
+            }
+            if (!err.message) {
+              err.message = err.name;
+            }
+            reject(err);
+          } else {
+            resolve(data);
           }
-          this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
-        }
-        resolve(data);
+        });
       });
-    });
+    } catch (err) {
+      throw err;
+    }
     // capture meta data from response message
     let metaObj;
     if (headObject && headObject.Metadata && headObject.Metadata.meta) {
