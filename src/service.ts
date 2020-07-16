@@ -690,7 +690,7 @@ export class Service {
         if (!subject) {
           subject = {};
         }
-        if (metaObj.owner && metaObj.owner[1]) {
+        if (metaObj && metaObj.owner && metaObj.owner[1]) {
           // modifying the scope to check for read operation
           subject.scope = metaObj.owner[1].value;
         }
@@ -714,14 +714,18 @@ export class Service {
         // check write access to destination bucket
         subject.scope = destinationSubjectScope;
         // target entity for ACS is destination bucket here
-        let writeAccessResponse = await checkAccessRequest(subject, item, AuthZAction.CREATE, bucket, this);
+        let writeAccessResponse = await checkAccessRequest(subject, resource,
+          AuthZAction.CREATE, bucket, this);
         if (writeAccessResponse.decision != Decision.PERMIT) {
           throw new PermissionDenied(writeAccessResponse.response.status.message, writeAccessResponse.response.status.code);
         }
         // need to iterate and check if there is at least one key set
         // since the gRPC adds default values for missing fields
         let optionsExist = false;
-        let optionKeys = Object.keys(options);
+        let optionKeys = [];
+        if (options) {
+          optionKeys = Object.keys(options);
+        }
         for (let optKey of optionKeys) {
           if (!_.isEmpty(options[optKey])) {
             optionsExist = true;
@@ -736,14 +740,24 @@ export class Service {
           params.TaggingDirective = 'REPLACE';
 
           // 1. Add user defined Metadata (this is always generated based on the orgKey input in facade)
-          if (!_.isEmpty(meta)) {
-            params.Metadata = {
-              meta: JSON.stringify(meta),
-              key,
-            };
-          } else {
-            this.logger.error('User has not provided any orgKey!');
+          if (!meta) {
+            meta = {} as any;
           }
+          if (_.isEmpty(meta.owner)) {
+            const urns = this.cfg.get('authorization:urns');
+            meta.owner = [{
+              id: urns.ownerIndicatoryEntity,
+              value: urns.organization
+            },
+            {
+              id: urns.ownerInstance,
+              value: destinationSubjectScope
+            }];
+          }
+          params.Metadata = {
+            meta: JSON.stringify(meta),
+            key,
+          };
 
           // 2. Add object metadata if provided
           // ContentEncoding
@@ -810,14 +824,24 @@ export class Service {
 
           // 1. Add user defined Metadata ( this is always generated based on the orgKey input in facade )
           params.MetadataDirective = 'REPLACE';
-          if (!_.isEmpty(meta)) {
-            params.Metadata = {
-              meta: JSON.stringify(meta),
-              key,
-            };
-          } else {
-            this.logger.error('User has not provided any orgKey!');
+          if (!meta) {
+            meta = {} as any;
           }
+          if (_.isEmpty(meta.owner)) {
+            const urns = this.cfg.get('authorization:urns');
+            meta.owner = [{
+              id: urns.ownerIndicatoryEntity,
+              value: urns.organization
+            },
+            {
+              id: urns.ownerInstance,
+              value: destinationSubjectScope
+            }];
+          }
+          params.Metadata = {
+            meta: JSON.stringify(meta),
+            key,
+          };
 
           // 2. Add Object metadata
           if (headObject) {
