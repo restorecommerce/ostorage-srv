@@ -739,7 +739,7 @@ export class Service {
           params.MetadataDirective = 'REPLACE';
           params.TaggingDirective = 'REPLACE';
 
-          // 1. Add user defined Metadata (this is always generated based on the orgKey input in facade)
+          // 1. Add user defined Metadata if its not provided
           if (!meta) {
             meta = {} as any;
           }
@@ -822,7 +822,7 @@ export class Service {
 
           // CASE 2: No options provided => copy the object as it is and update user defined metadata (owner)
 
-          // 1. Add user defined Metadata ( this is always generated based on the orgKey input in facade )
+          // 1. Add user defined Metadata if its not provided
           params.MetadataDirective = 'REPLACE';
           if (!meta) {
             meta = {} as any;
