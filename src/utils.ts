@@ -1,5 +1,5 @@
 import {
-  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject
+  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject, ApiKeyValue
 } from '@restorecommerce/acs-client';
 import { RedisClient } from 'redis';
 import * as _ from 'lodash';
@@ -93,7 +93,7 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
   };
 }
 
-export const getSubjectFromRedis = async (subject: any, api_key: string, redisClient: RedisClient) => {
+export const getSubjectFromRedis = async (subject: any, api_key: ApiKeyValue, redisClient: RedisClient) => {
   if (!subject) {
     subject = {};
   }
