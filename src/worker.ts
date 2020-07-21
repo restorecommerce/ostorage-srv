@@ -46,7 +46,7 @@ export class Worker {
     const redisClient = new createClient(redisConfig);
 
     const oss = new Service(cfg, logger, this.authZ, redisClient);
-    const cis = new OStorageCommandInterface(server, cfg.get(), logger, events);
+    const cis = new OStorageCommandInterface(server, cfg, logger, events);
     this.oss = oss;
 
     const eventListener = async (msg: any, context: any, config: any, eventName: string) => {
