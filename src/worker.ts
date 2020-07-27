@@ -49,7 +49,7 @@ export class Worker {
     initializeCache();
 
     const oss = new Service(cfg, logger, this.authZ, redisClient);
-    const cis = new OStorageCommandInterface(server, cfg, logger, events);
+    const cis = new OStorageCommandInterface(server, cfg, logger, events, redisClient);
     this.oss = oss;
 
     const eventListener = async (msg: any, context: any, config: any, eventName: string) => {
