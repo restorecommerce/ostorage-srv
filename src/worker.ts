@@ -6,7 +6,7 @@ import * as chassis from '@restorecommerce/chassis-srv';
 import { Service } from './service';
 import { OStorageCommandInterface } from './commandInterface';
 import { createClient } from 'redis';
-import { initAuthZ, ACSAuthZ } from '@restorecommerce/acs-client';
+import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
 
 export class Worker {
   events: Events;
@@ -44,6 +44,9 @@ export class Worker {
     const redisConfig = cfg.get('redis');
     redisConfig.db = cfg.get('redis:db-indexes:db-subject');
     const redisClient = new createClient(redisConfig);
+
+    // init ACS cache
+    initializeCache();
 
     const oss = new Service(cfg, logger, this.authZ, redisClient);
     const cis = new OStorageCommandInterface(server, cfg, logger, events);
