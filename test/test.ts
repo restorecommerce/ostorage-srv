@@ -212,6 +212,7 @@ describe('testing ostorage-srv with ACS enabled', () => {
       let response, putResponse;
       subject = acsSubject;
       subject.scope = 'orgD'; // set scope to invalid value which does not exist in user HR scope
+      subject.id = 'invalid_user_scope_id'
       // create streaming client request
       const clientConfig = cfg.get('grpc-client:service-ostorage');
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
@@ -249,13 +250,15 @@ describe('testing ostorage-srv with ACS enabled', () => {
         });
       });
       should.exist(response.error);
-      response.error.message.should.equal('Access not allowed for request with subject:admin_user_id, resource:test, action:CREATE, target_scope:orgD; the response was DENY');
+      response.error.message.should.equal('Access not allowed for request with subject:invalid_user_scope_id, resource:test, action:CREATE, target_scope:orgD; the response was DENY');
       sleep.sleep(3);
     });
     it('With invalid subject scope should throw an error when reading object', async () => {
       const clientConfig = cfg.get('grpc-client:service-ostorage');
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
       const get = client.makeEndpoint('get', clientConfig.publisher.instances[0]);
+      // make sub id invalid so that data is not read from ACS cache
+      subject.id = 'invalid_subject_id_1';
       const call = await get({
         key: 'config_acs_enabled.json',
         bucket: 'test',
@@ -287,20 +290,24 @@ describe('testing ostorage-srv with ACS enabled', () => {
         }
       } catch (err) {
         should.exist(err.details);
-        err.details.should.equal('Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgC; the response was DENY');
+        err.details.should.equal('Access not allowed for request with subject:invalid_subject_id_1, resource:test, action:READ, target_scope:orgC; the response was DENY');
       }
       sleep.sleep(3);
     });
     it('With invalid subject scope should throw an error when listing object', async () => {
+       // make sub id invalid so that data is not read from ACS cache
+       subject.id = 'invalid_subject_id_2';
       let result = await oStorage.list({
         bucket: 'test',
         subject
       });
       should.exist(result.error);
-      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgD; the response was DENY');
+      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:invalid_subject_id_2, resource:test, action:READ, target_scope:orgD; the response was DENY');
       sleep.sleep(3);
     });
     it('With invalid subject scope should throw an error when deleting object', async () => {
+      // make sub id invalid so that data is not read from ACS cache
+      subject.id = 'invalid_subject_id_3';
       let result = await oStorage.delete({
         bucket: 'test',
         key: 'config_acs_enabled.json',
@@ -308,10 +315,12 @@ describe('testing ostorage-srv with ACS enabled', () => {
       });
       // NOTE: before deleting the object is read to make sure it exists, so we get a read error
       should.exist(result.error);
-      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgD; the response was DENY');
+      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:invalid_subject_id_3, resource:test, action:READ, target_scope:orgD; the response was DENY');
       sleep.sleep(3);
     });
     it('With invalid scope should throw an error when replacing the object', async () => {
+      // make sub id invalid so that data is not read from ACS cache
+      subject.id = 'invalid_subject_id_4';
       // create streaming client request
       const data = {
         items: {
@@ -337,10 +346,11 @@ describe('testing ostorage-srv with ACS enabled', () => {
       const result = await oStorage.copy(data);
       should.exist(result.error);
       should.exist(result.error.details);
-      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:test, action:READ, target_scope:orgC; the response was DENY');
+      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:invalid_subject_id_4, resource:test, action:READ, target_scope:orgC; the response was DENY');
       sleep.sleep(3);
     });
     it('With valid scope should replace the object', async () => {
+      subject.id = 'admin_user_id';
       subject.scope = 'orgC'; // setting valid subject scope
       await stopGrpcMockServer(mockServer, logger);
       // PERMIT mock
