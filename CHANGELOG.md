@@ -1,3 +1,3 @@
-# 0.0.1
+### 0.1.0 (July 29th, 2020)
 
-- Service init
+- initial release
