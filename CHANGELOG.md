@@ -1,3 +1,8 @@
+### 0.1.3 (September 9th, 2020)
+
+- updated acs-client and protos
+- fix not to read subject from redis
+
 ### 0.1.2 (Auguest 27th, 2020)
 
 - healthcheck fix, updated dependencies
