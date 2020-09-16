@@ -238,6 +238,8 @@ List of events emitted by this microservice for below topics:
 |                              | `resetResponse` | system reset response
 |                              | `healthCheckResponse` | system health check response
 |                              | `versionResponse` | system version response
+|                              | `configUpdateResponse` | configuration update response
+|                              | `flushCacheResponse` | flush ACS Cache response
 |==========================================================================================================================================
 
 [#consumed-events]
@@ -252,6 +254,8 @@ This microservice consumes messages for the following events by topic:
 |                              | `resetCommand` | for triggering system reset
 |                              | `healthCheckCommand` | to get system health check
 |                              | `versionCommand` | to get system version
+|                              | `configUpdateCommand` | used to update configurations
+|                              | `setApiKeyCommand` | used to set API key
 |==========================================================================================================================================
 
 **Note**: currently restore and reset are not implemented.
