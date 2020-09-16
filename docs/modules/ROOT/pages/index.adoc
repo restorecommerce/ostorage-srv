@@ -44,6 +44,8 @@ on Tag which is identifying one or more objects to which the rule applies
 (e.g. 'Tag { Key: 'id_1', Value: 'value_1' }' expires all objects tagged with the respective key-value pair).
 - https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json#L26[`Rules.ID`]: unique identifier for the rule.
 The value cannot be longer than 255 characters.
+- `authorization:enable`: default value is `true`, if set to `true` then access-control check is performed, if value is set to `false` then access-control check is overridden.
+- `authorization:enforce`: default value is `true`, if set to `true` then result of access-control-check is enforced, if value is set to `false` the result of access-control check if logged and ignored.
 
 [#API]
 == API
@@ -67,6 +69,7 @@ is `io.restorecommerce.ostorage.Response` message.
 | key | string | required | Object Key.
 | meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | metadata attached to Object.
 | options | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.ostorage.Options`] | optional | headers attached to Object.
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.Options`
@@ -112,6 +115,7 @@ Requests are performed using `io.restorecommerce.ostorage.GetRequest` protobuf m
 | bucket | string | required | Bucket to which the object is mapped to
 | flag | boolean | optional | If flag is set to `true` only metadata of object is fetched
 | download | boolean | optional | If flag is set to `true` then Content-Disposition is set as `attachment` else is set as `inline`
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
 |==============================================================================================================================================
 
 [#api_ostorage_list]
@@ -127,6 +131,7 @@ Requests are performed using `io.restorecommerce.ostorage.ListRequest` protobuf 
 | Field | Type | Label | Description
 | bucket | string | optional | If bucket name provied it will return its files otherwise it will return all files
 | filter | google.protobuf.Struct | optional | Filter based on fieldName, operation, value
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.ObjectsData`
@@ -160,6 +165,7 @@ Requests are performed using `io.restorecommerce.ostorage.Bucket` protobuf messa
 | Field | Type | Label | Description
 | bucket | string | required | Bucket to which the object is mapped to
 | key | string | required | Object key
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
 |==============================================================================================================================================
 
 [#api_ostorage_copy]
@@ -182,6 +188,7 @@ is specified in the `io.restorecommerce.ostorage.CopyRequest` and if tagging is 
 |==============================================================================================================================================
 | Field | Type | Label | Description
 | items | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`[\] io.restorecommerce.ostorage.CopyRequestItem`] | required | List of objects to be copied
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.CopyResponse`
