@@ -93,7 +93,7 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
   };
 }
 
-export const getSubjectFromRedis = async (subject: any, api_key: ApiKeyValue, redisClient: RedisClient) => {
+export const getSubject = async (subject: any, api_key: ApiKeyValue, redisClient: RedisClient) => {
   if (!subject) {
     subject = {};
   }

@@ -5,7 +5,7 @@ import { PassThrough, Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
 import { RedisClient } from 'redis';
-import { getSubjectFromRedis, checkAccessRequest, AccessResponse } from './utils';
+import { getSubject, checkAccessRequest, AccessResponse } from './utils';
 import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Resource, Subject, updateConfig } from '@restorecommerce/acs-client';
 import {
   Attribute, Options, FilterType, RequestType,
@@ -180,7 +180,7 @@ export class Service {
 
     let subject = call.request.subject;
     let api_key = call.request.api_key;
-    subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
+    subject = await getSubject(subject, api_key, this.redisClient);
     let resource: any = { bucket, filter };
     let acsResponse: AccessResponse;
     try {
@@ -460,7 +460,7 @@ export class Service {
       if (metaObj.owner && metaObj.owner[1]) {
         subject.scope = metaObj.owner[1].value;
       }
-      subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
+      subject = await getSubject(subject, api_key, this.redisClient);
       let resource = { key, bucket, meta: metaObj };
       let acsResponse: AccessResponse;
       try {
@@ -614,7 +614,7 @@ export class Service {
     if (!stream) {
       let response;
       try {
-        subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
+        subject = await getSubject(subject, api_key, this.redisClient);
         let resource = { key, bucket, meta, options };
         this.createMetadata(resource, subject);
         // created meta if it was not provided in request
@@ -725,7 +725,7 @@ export class Service {
           // modifying the scope to check for read operation
           subject.scope = metaObj.owner[1].value;
         }
-        subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
+        subject = await getSubject(subject, api_key, this.redisClient);
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
         let resource = { key, sourceBucketName, meta: metaObj };
@@ -1084,7 +1084,7 @@ export class Service {
 
   async delete(call: Call<DeleteRequest>, context?: any): Promise<void> {
     const { bucket, key } = call.request;
-    let subject = await getSubjectFromRedis(call.request.subject, call.request.api_key, this.redisClient);
+    let subject = await getSubject(call.request.subject, call.request.api_key, this.redisClient);
     if (!_.includes(this.buckets, bucket)) {
       throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
     }
