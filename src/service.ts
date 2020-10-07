@@ -367,8 +367,18 @@ export class Service {
     }
     // capture meta data from response message
     let metaObj;
-    if (headObject && headObject.Metadata && headObject.Metadata.meta) {
-      metaObj = JSON.parse(headObject.Metadata.meta);
+    let data = {};
+    let meta_subject = { id: '' };
+    if (headObject && headObject.Metadata) {
+      if (headObject.Metadata.meta) {
+        metaObj = JSON.parse(headObject.Metadata.meta);
+      }
+      if (headObject.Metadata.data) {
+        data = JSON.parse(headObject.Metadata.data);
+      }
+      if (headObject.Metadata.subject) {
+        meta_subject = JSON.parse(headObject.Metadata.subject);
+      }
     }
 
     // capture options from response headers
@@ -382,35 +392,6 @@ export class Service {
       }
       if (headObject.ContentType) {
         content_type = headObject.ContentType;
-        // get object tagging of the object stored in the S3 object storage
-        let objectTagging: any;
-        try {
-          objectTagging = await new Promise((resolve, reject) => {
-            this.ossClient.getObjectTagging(params, async (err: any, data) => {
-              if (err) {
-                // map the s3 error codes to standard chassis-srv errors
-                if (err.code === 'NotFound') {
-                  err = new errors.NotFound('The specified key was not found');
-                  err.code = 404;
-                }
-                this.logger.error('Error occurred while retrieving tags for key:',
-                  {
-                    Key: key, error: err, errorStack: err.stack
-                  });
-                await call.end(err);
-                return reject(err);
-              } else {
-                resolve(data);
-              }
-            });
-          });
-        } catch (err) {
-          this.logger.info('No object tagging found for key:',
-            {
-              Key: key, error: err, errorStack: err.stack
-            });
-        }
-
         // capture meta data from response message
         let metaObj;
         if (headObject && headObject.Metadata && headObject.Metadata.meta) {
@@ -461,7 +442,7 @@ export class Service {
         subject.scope = metaObj.owner[1].value;
       }
       subject = await getSubject(subject, api_key, this.redisClient);
-      let resource = { key, bucket, meta: metaObj };
+      let resource = { key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: AccessResponse;
       try {
         // target entity for ACS is bucket name here
@@ -568,6 +549,12 @@ export class Service {
     return resource;
   }
 
+  private unmarshallProtobufAny(msg: any): any {
+    if (msg && msg.value) {
+      return JSON.parse(msg.value.toString());
+    }
+  }
+
   async put(call: any, callback: any): Promise<PutResponse> {
     let stream = true;
     let completeBuffer = [];
@@ -613,6 +600,9 @@ export class Service {
     }
     if (!stream) {
       let response;
+      if (options && options.data) {
+        options.data = this.unmarshallProtobufAny(options.data);
+      }
       try {
         subject = await getSubject(subject, api_key, this.redisClient);
         let resource = { key, bucket, meta, options };
@@ -631,12 +621,17 @@ export class Service {
         if (acsResponse.decision != Decision.PERMIT) {
           throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
         }
+        let subjectID = '';
+        if (subject && subject.id) {
+          subjectID = subject.id;
+        }
         response = await this.storeObject(
           key,
           bucket,
           Buffer.concat(completeBuffer), // object
           meta,
-          options
+          options,
+          subjectID
         );
         return response;
       } catch (e) {
@@ -715,8 +710,18 @@ export class Service {
           throw err;
         }
         let metaObj;
-        if (headObject && headObject.Metadata && headObject.Metadata.meta) {
-          metaObj = JSON.parse(headObject.Metadata.meta);
+        let data = {};
+        let meta_subject = { id: '' };
+        if (headObject && headObject.Metadata) {
+          if (headObject.Metadata.meta) {
+            metaObj = JSON.parse(headObject.Metadata.meta);
+          }
+          if (headObject.Metadata.data) {
+            data = headObject.Metadata.data;
+          }
+          if (headObject.Metadata.subject) {
+            meta_subject = JSON.parse(headObject.Metadata.subject);
+          }
         }
         if (!subject) {
           subject = {};
@@ -728,7 +733,7 @@ export class Service {
         subject = await getSubject(subject, api_key, this.redisClient);
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
-        let resource = { key, sourceBucketName, meta: metaObj };
+        let resource = { key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
         let acsResponse: AccessResponse;
         try {
           // target entity for ACS is source bucket here
@@ -984,12 +989,23 @@ export class Service {
     return (allowedCharacters.test(key));
   }
 
-  private async storeObject(key: string, bucket: string, object: any, meta: any, options: Options): Promise<PutResponse> {
+  private async storeObject(key: string, bucket: string, object: any, meta: any,
+    options: Options, subjectID: string): Promise<PutResponse> {
     this.logger.info('Received a request to store Object:', { Key: key, Bucket: bucket });
     try {
-
+      let data = {};
+      if (options && options.data) {
+        data = options.data;
+      }
+      let subject = {};
+      if (subjectID) {
+        subject = { id: subjectID };
+      }
+      // only string data type can be stored in object metadata
       let metaData = {
         meta: JSON.stringify(meta),
+        data: JSON.stringify(data),
+        subject: JSON.stringify(subject),
         key,
       };
       // add stream of data into a readable stream
@@ -1128,10 +1144,20 @@ export class Service {
     }
     // capture meta data from response message
     let metaObj;
-    if (headObject && headObject.Metadata && headObject.Metadata.meta) {
-      metaObj = JSON.parse(headObject.Metadata.meta);
+    let data = {};
+    let meta_subject = { id: '' };
+    if (headObject && headObject.Metadata) {
+      if (headObject.Metadata.meta) {
+        metaObj = JSON.parse(headObject.Metadata.meta);
+      }
+      if (headObject.Metadata.data) {
+        data = JSON.parse(headObject.Metadata.data);
+      }
+      if (headObject.Metadata.subject) {
+        meta_subject = JSON.parse(headObject.Metadata.subject);
+      }
     }
-    Object.assign(resources, { meta: metaObj });
+    Object.assign(resources, { meta: metaObj, data, subject: { id: meta_subject.id } });
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,

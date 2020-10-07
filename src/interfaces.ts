@@ -25,6 +25,7 @@ export interface Options {
   version?: string;
   md5?: string;
   tags?: Attribute[];
+  data?: any;
 }
 
 export interface FilterType {
