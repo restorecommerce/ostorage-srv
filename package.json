@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/ostorage-srv",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Restore Commerce microservice for storing objects",
   "main": "lib/start.js",
   "author": "Invend GmbH",
