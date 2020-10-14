@@ -198,6 +198,18 @@
             "grpcOstorage"
           ]
         }
+      },
+      "grpc-health-v1": {
+        "check": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        },
+        "watch": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        }
       }
     },
     "transports": [
