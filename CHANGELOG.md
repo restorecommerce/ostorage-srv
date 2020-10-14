@@ -2,6 +2,8 @@
 
 - add new grpc healthcheck with readiness probe
 - listen on 0.0.0.0 for grpc port
+- changes to store data (google.protobuf.Any meta data) to metaObject and also the subject_id, removed duplicate object tags reading
+- up dependencies
 
 ### 0.1.5 (October 9th, 2020)
 
