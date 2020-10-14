@@ -1,3 +1,12 @@
+### 0.1.6 (October 14th, 2020)
+
+- add new grpc healthcheck with readiness probe
+- listen on 0.0.0.0 for grpc port
+
+### 0.1.5 (October 9th, 2020)
+
+- up acs-client includes fix for validation of subID and token
+
 ### 0.1.4 (October 3rd, 2020)
 
 - restructured protos

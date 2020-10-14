@@ -84,6 +84,10 @@ export class Worker {
     const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
     await server.bind(reflectionServiceName, reflectionService);
 
+    await server.bind(serviceNamesCfg.health, new chassis.Health(cis, async () => {
+      return redisClient.ping();
+    }));
+
     // Start server
     await oss.start();
     await server.start();
