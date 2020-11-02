@@ -5,7 +5,7 @@ import { PassThrough, Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
 import { RedisClient } from 'redis';
-import { getSubject, checkAccessRequest, AccessResponse } from './utils';
+import { checkAccessRequest, AccessResponse } from './utils';
 import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Resource, Subject, updateConfig } from '@restorecommerce/acs-client';
 import {
   Attribute, Options, FilterType, RequestType,
@@ -179,8 +179,6 @@ export class Service {
     let { bucket, filter } = call.request;
 
     let subject = call.request.subject;
-    let api_key = call.request.api_key;
-    subject = await getSubject(subject, api_key, this.redisClient);
     let resource: any = { bucket, filter };
     let acsResponse: AccessResponse;
     try {
@@ -313,7 +311,6 @@ export class Service {
     // get gRPC call request
     const { bucket, key, download } = call.request;
     let subject = call.request.subject;
-    let api_key = call.request.api_key;
     // GET meta from stored object and query for accessReq with this meta
     if (!_.includes(this.buckets, bucket)) {
       return await call.end(new errors.InvalidArgument(`Invalid bucket name ${bucket}`));
@@ -435,13 +432,9 @@ export class Service {
 
 
       // Make ACS request with the meta object read from storage
-      if (!subject) {
-        subject = {};
-      }
       if (metaObj.owner && metaObj.owner[1]) {
         subject.scope = metaObj.owner[1].value;
       }
-      subject = await getSubject(subject, api_key, this.redisClient);
       let resource = { key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: AccessResponse;
       try {
@@ -558,7 +551,7 @@ export class Service {
   async put(call: any, callback: any): Promise<PutResponse> {
     let stream = true;
     let completeBuffer = [];
-    let key, bucket, meta, object, options, subject, api_key;
+    let key, bucket, meta, object, options, subject;
 
     while (stream) {
       try {
@@ -578,7 +571,6 @@ export class Service {
         object = streamResponse.object;
         options = streamResponse.options;
         subject = streamResponse.subject;
-        api_key = streamResponse.api_key;
         // check object name
         if (!this.IsValidObjectName(key)) {
           stream = false;
@@ -604,7 +596,6 @@ export class Service {
         options.data = this.unmarshallProtobufAny(options.data);
       }
       try {
-        subject = await getSubject(subject, api_key, this.redisClient);
         let resource = { key, bucket, meta, options };
         this.createMetadata(resource, subject);
         // created meta if it was not provided in request
@@ -652,7 +643,6 @@ export class Service {
     let copyObjectResult;
 
     let subject = call.request.subject;
-    let api_key = call.request.api_key;
     let destinationSubjectScope; // scope for destination bucket
     if (subject && subject.scope) {
       destinationSubjectScope = subject.scope;
@@ -730,7 +720,6 @@ export class Service {
           // modifying the scope to check for read operation
           subject.scope = metaObj.owner[1].value;
         }
-        subject = await getSubject(subject, api_key, this.redisClient);
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
         let resource = { key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
@@ -1100,7 +1089,7 @@ export class Service {
 
   async delete(call: Call<DeleteRequest>, context?: any): Promise<void> {
     const { bucket, key } = call.request;
-    let subject = await getSubject(call.request.subject, call.request.api_key, this.redisClient);
+    let subject = call.request.subject;
     if (!_.includes(this.buckets, bucket)) {
       throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
     }

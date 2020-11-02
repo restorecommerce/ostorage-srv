@@ -1,5 +1,5 @@
 import {
-  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject, ApiKeyValue
+  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject
 } from '@restorecommerce/acs-client';
 import { RedisClient } from 'redis';
 import * as _ from 'lodash';
@@ -92,13 +92,3 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
     custom_query_args: { custom_queries, custom_arguments }
   };
 }
-
-export const getSubject = async (subject: any, api_key: ApiKeyValue, redisClient: RedisClient) => {
-  if (!subject) {
-    subject = {};
-  }
-  if (api_key) {
-    subject = { api_key };
-  }
-  return subject;
-};
