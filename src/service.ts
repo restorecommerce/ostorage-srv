@@ -4,15 +4,11 @@ import * as MemoryStream from 'memorystream';
 import { PassThrough, Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
-import { RedisClient } from 'redis';
 import { checkAccessRequest, AccessResponse } from './utils';
-import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Resource, Subject, updateConfig } from '@restorecommerce/acs-client';
+import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Subject, updateConfig } from '@restorecommerce/acs-client';
 import {
-  Attribute, Options, FilterType, RequestType,
-  GetRequest, ListRequest, DeleteRequest, Call,
-  PutRequest, PutResponse, CopyRequest, CopyResponse,
-  CopyRequestList, CopyResponseList, CopyObjectParams,
-  Owner, Meta
+  Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse, CopyResponse,
+  CopyResponseList, CopyObjectParams, Meta
 } from './interfaces';
 
 const META_OWNER = 'meta.owner';
@@ -22,17 +18,15 @@ export class Service {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
   buckets: string[];
   bucketsLifecycleConfigs?: any;
-  redisClient: RedisClient;
   authZ: ACSAuthZ;
   cfg: any;
   authZCheck: boolean;
 
-  constructor(cfg: any, private logger: any, authZ: ACSAuthZ, redisClient: RedisClient) {
+  constructor(cfg: any, private logger: any, authZ: ACSAuthZ) {
     this.ossClient = new aws.S3(cfg.get('s3:client'));
     this.buckets = cfg.get('s3:buckets') || [];
     this.bucketsLifecycleConfigs = cfg.get('s3.bucketsLifecycleConfigs');
     this.authZ = authZ;
-    this.redisClient = redisClient;
     this.cfg = cfg;
     this.authZCheck = cfg.get('authorization:enabled');
   }

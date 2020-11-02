@@ -48,7 +48,7 @@ export class Worker {
     // init ACS cache
     initializeCache();
 
-    const oss = new Service(cfg, logger, this.authZ, redisClient);
+    const oss = new Service(cfg, logger, this.authZ);
     const cis = new OStorageCommandInterface(server, cfg, logger, events, redisClient);
     this.oss = oss;
 
