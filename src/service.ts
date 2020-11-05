@@ -722,7 +722,7 @@ export class Service {
             metaObj = JSON.parse(headObject.Metadata.meta);
           }
           if (headObject.Metadata.data) {
-            data = headObject.Metadata.data;
+            data = JSON.parse(headObject.Metadata.data);
           }
           if (headObject.Metadata.subject) {
             meta_subject = JSON.parse(headObject.Metadata.subject);
@@ -798,7 +798,15 @@ export class Service {
           params.Metadata = {
             meta: JSON.stringify(meta),
             key,
+            subject: JSON.stringify({ id: subject.id })
           };
+          // override data if it is provided
+          if (options.data) {
+            // params.Metadata.data = JSON.stringify(options.data);
+            params.Metadata.data = JSON.stringify(this.unmarshallProtobufAny(options.data));
+          } else {
+            params.Metadata.data = JSON.stringify(data);
+          }
 
           // 2. Add object metadata if provided
           // ContentEncoding
@@ -883,8 +891,10 @@ export class Service {
             }];
           }
           params.Metadata = {
+            data: JSON.stringify(data),
             meta: JSON.stringify(meta),
             key,
+            subject: JSON.stringify({ id: subject.id })
           };
 
           // 2. Add Object metadata
