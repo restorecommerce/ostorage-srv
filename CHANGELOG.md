@@ -1,3 +1,8 @@
+### 0.1.8 (November 5th, 2020)
+
+- fix copy operation to store options data in meta object
+- removed listObjects check for delete operation and fix list objects when no scoping defined in rules
+
 ### 0.1.7 (October 19th, 2020)
 
 - updated chassis-srv
