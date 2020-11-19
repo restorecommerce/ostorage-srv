@@ -177,6 +177,7 @@ export class Service {
     let acsResponse: AccessResponse;
     try {
       // target entity for ACS is bucket name here
+      Object.assign(resource, { subject });
       acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
         bucket, this);
     } catch (err) {
@@ -248,7 +249,7 @@ export class Service {
                       });
                     // map the s3 error codes to standard chassis-srv errors
                     if (err.code === 'NotFound') {
-                      err = new errors.NotFound('The specified key was not found');
+                      err = new errors.NotFound('Specified key does not exist');
                       err.code = 404;
                     }
                     if (!err.message) {
@@ -289,6 +290,10 @@ export class Service {
                 if (match && ownerInst && ownerValues.includes(ownerInst)) {
                   this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
                 }
+                // no scoping defined in the Rule
+                if (!ownerValues) {
+                  objectToReturn.push(object);
+                }
               }
             } else {
               this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
@@ -321,7 +326,7 @@ export class Service {
         if (err) {
           // map the s3 error codes to standard chassis-srv errors
           if (err.code === 'NotFound') {
-            err = new errors.NotFound('The specified key was not found');
+            err = new errors.NotFound('Specified key does not exist');
             err.code = 404;
           }
           this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
@@ -339,7 +344,7 @@ export class Service {
           if (err) {
             // map the s3 error codes to standard chassis-srv errors
             if (err.code === 'NotFound') {
-              err = new errors.NotFound('The specified key was not found');
+              err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
             this.logger.error('Error occurred while retrieving metadata for key:',
@@ -474,7 +479,7 @@ export class Service {
           })
           .on('httpError', async (err: any) => {
             if (err.code === 'NotFound') {
-              err = new errors.NotFound('The specified key was not found');
+              err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
             // map the s3 error codes to standard chassis-srv errors
@@ -488,7 +493,7 @@ export class Service {
           .on('error', async (err: any) => {
             // map the s3 error codes to standard chassis-srv errors
             if (err.code === 'NotFound') {
-              err = new errors.NotFound('The specified key was not found');
+              err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
             this.logger.error('Error occurred while getting object',
@@ -678,7 +683,7 @@ export class Service {
                   });
                 // map the s3 error codes to standard chassis-srv errors
                 if (err.code === 'NotFound') {
-                  err = new errors.NotFound('The specified key was not found');
+                  err = new errors.NotFound('Specified key does not exist');
                   err.code = 404;
                 }
                 if (!err.message) {
@@ -701,7 +706,7 @@ export class Service {
             metaObj = JSON.parse(headObject.Metadata.meta);
           }
           if (headObject.Metadata.data) {
-            data = headObject.Metadata.data;
+            data = JSON.parse(headObject.Metadata.data);
           }
           if (headObject.Metadata.subject) {
             meta_subject = JSON.parse(headObject.Metadata.subject);
@@ -776,7 +781,15 @@ export class Service {
           params.Metadata = {
             meta: JSON.stringify(meta),
             key,
+            subject: JSON.stringify({ id: subject.id })
           };
+          // override data if it is provided
+          if (options.data) {
+            // params.Metadata.data = JSON.stringify(options.data);
+            params.Metadata.data = JSON.stringify(this.unmarshallProtobufAny(options.data));
+          } else {
+            params.Metadata.data = JSON.stringify(data);
+          }
 
           // 2. Add object metadata if provided
           // ContentEncoding
@@ -861,8 +874,10 @@ export class Service {
             }];
           }
           params.Metadata = {
+            data: JSON.stringify(data),
             meta: JSON.stringify(meta),
             key,
+            subject: JSON.stringify({ id: subject.id })
           };
 
           // 2. Add Object metadata
@@ -1089,18 +1104,6 @@ export class Service {
     }
 
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
-    const objectsList = await this.list(call);
-    let objectExists = false;
-    for (let object of objectsList) {
-      if (object.object_name.indexOf(key) > -1) {
-        objectExists = true;
-        break;
-      }
-    }
-    if (!objectExists) {
-      throw new errors.InvalidArgument('Invalid key name');
-    }
-
     let headObject: any;
     let resources = { Bucket: bucket, Key: key };
     try {
@@ -1110,7 +1113,7 @@ export class Service {
             this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
             // map the s3 error codes to standard chassis-srv errors
             if (err.code === 'NotFound') {
-              err = new errors.NotFound('The specified key was not found');
+              err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
             if (!err.message) {
