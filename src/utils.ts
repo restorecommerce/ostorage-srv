@@ -55,9 +55,6 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
   entity: string, service: Service, resourceNameSpace?: string): Promise<AccessResponse | ReadPolicyResponse> {
   let authZ = service.authZ;
   let data = _.cloneDeep(resources);
-  console.log('SUBJECT is.........', subject);
-  console.log('Resource is......', data);
-  console.log('Action is.........', action);
   if (!_.isArray(resources) && action != AuthZAction.READ) {
     data = [resources];
   } else if (action === AuthZAction.READ) {
@@ -67,7 +64,6 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
 
   let result: Decision | PolicySetRQ;
   try {
-    console.log('MAKING ACCESS REQ TO ACS CLIENT..............', subject, data, action);
     result = await accessRequest(subject, data, action, authZ, entity, resourceNameSpace);
   } catch (err) {
     return {
