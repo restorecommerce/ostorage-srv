@@ -1,3 +1,8 @@
+### 0.1.9 (November 19th, 2020)
+
+- update to remove subject-id and pass token to acs-client
+- updated dependencies
+
 ### 0.1.8 (November 5th, 2020)
 
 - fix copy operation to store options data in meta object
