@@ -7,11 +7,12 @@ import { Service } from './service';
 import { OStorageCommandInterface } from './commandInterface';
 import { createClient } from 'redis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
+import { Logger } from 'winston';
 
 export class Worker {
   events: Events;
   server: any;
-  logger: chassis.Logger;
+  logger: Logger;
   cfg: any;
   topics: any;
   offsetStore: chassis.OffsetStore;
