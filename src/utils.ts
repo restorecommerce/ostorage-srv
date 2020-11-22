@@ -4,6 +4,9 @@ import {
 import { RedisClient } from 'redis';
 import * as _ from 'lodash';
 import { Service } from './service';
+import { createServiceConfig } from '@restorecommerce/service-config';
+import { createLogger } from '@restorecommerce/logger';
+import { Client } from '@restorecommerce/grpc-client';
 
 export interface HierarchicalScope {
   id: string;
@@ -41,6 +44,21 @@ export interface ReadPolicyResponse extends AccessResponse {
   };
 }
 
+// Create a ids client instance
+let idsClientInstance;
+const getUserServiceClient = async () => {
+  if (!idsClientInstance) {
+    const cfg = createServiceConfig(process.cwd());
+    // identity-srv client to resolve subject ID by token
+    const grpcIDSConfig = cfg.get('client:user');
+    const logger = createLogger(cfg.get('logger'));
+    if (grpcIDSConfig) {
+      const idsClient = new Client(grpcIDSConfig, logger);
+      idsClientInstance = await idsClient.connect();
+    }
+  }
+  return idsClientInstance;
+};
 
 /**
  * Perform an access request using inputs from a GQL request
@@ -55,6 +73,17 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
   entity: string, service: Service, resourceNameSpace?: string): Promise<AccessResponse | ReadPolicyResponse> {
   let authZ = service.authZ;
   let data = _.cloneDeep(resources);
+  // resolve subject id using findByToken api and update subject with id
+  let dbSubject;
+  if (subject && subject.token) {
+    const idsClient = await getUserServiceClient();
+    if (idsClient) {
+      dbSubject = await idsClient.findByToken({ request: { token: subject.token } });
+      if (dbSubject && dbSubject.data && dbSubject.data.id) {
+        subject.id = dbSubject.data.id;
+      }
+    }
+  }
   if (!_.isArray(resources) && action != AuthZAction.READ) {
     data = [resources];
   } else if (action === AuthZAction.READ) {
