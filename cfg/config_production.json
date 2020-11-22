@@ -51,6 +51,14 @@
           "grpc://access-contorl-srv:50061"
         ]
       }
+    },
+    "user": {
+      "publisher": {
+        "name": "static",
+        "instances": [
+          "grpc://identity-srv:50051"
+        ]
+      }
     }
   }
 }
