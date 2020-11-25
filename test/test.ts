@@ -313,9 +313,8 @@ describe('testing ostorage-srv with ACS enabled', () => {
         key: 'config_acs_enabled.json',
         subject
       });
-      // NOTE: before deleting the object is read to make sure it exists, so we get a read error
       should.exist(result.error);
-      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:invalid_subject_id_3, resource:test, action:READ, target_scope:orgD; the response was DENY');
+      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:invalid_subject_id_3, resource:test, action:DELETE, target_scope:orgD; the response was DENY');
       sleep.sleep(3);
     });
     it('With invalid scope should throw an error when replacing the object', async () => {

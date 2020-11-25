@@ -310,6 +310,9 @@ export class Service {
     // get gRPC call request
     const { bucket, key, download } = call.request;
     let subject = call.request.subject;
+    if (!subject) {
+      subject = {};
+    }
     // GET meta from stored object and query for accessReq with this meta
     if (!_.includes(this.buckets, bucket)) {
       return await call.end(new errors.InvalidArgument(`Invalid bucket name ${bucket}`));
