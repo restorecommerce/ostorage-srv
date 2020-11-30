@@ -4,15 +4,11 @@ import * as MemoryStream from 'memorystream';
 import { PassThrough, Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
-import { RedisClient } from 'redis';
-import { getSubjectFromRedis, checkAccessRequest, AccessResponse } from './utils';
-import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Resource, Subject, updateConfig } from '@restorecommerce/acs-client';
+import { checkAccessRequest, AccessResponse } from './utils';
+import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Subject, updateConfig } from '@restorecommerce/acs-client';
 import {
-  Attribute, Options, FilterType, RequestType,
-  GetRequest, ListRequest, DeleteRequest, Call,
-  PutRequest, PutResponse, CopyRequest, CopyResponse,
-  CopyRequestList, CopyResponseList, CopyObjectParams,
-  Owner, Meta
+  Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse, CopyResponse,
+  CopyResponseList, CopyObjectParams, Meta
 } from './interfaces';
 
 const META_OWNER = 'meta.owner';
@@ -22,17 +18,15 @@ export class Service {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
   buckets: string[];
   bucketsLifecycleConfigs?: any;
-  redisClient: RedisClient;
   authZ: ACSAuthZ;
   cfg: any;
   authZCheck: boolean;
 
-  constructor(cfg: any, private logger: any, authZ: ACSAuthZ, redisClient: RedisClient) {
+  constructor(cfg: any, private logger: any, authZ: ACSAuthZ) {
     this.ossClient = new aws.S3(cfg.get('s3:client'));
     this.buckets = cfg.get('s3:buckets') || [];
     this.bucketsLifecycleConfigs = cfg.get('s3.bucketsLifecycleConfigs');
     this.authZ = authZ;
-    this.redisClient = redisClient;
     this.cfg = cfg;
     this.authZCheck = cfg.get('authorization:enabled');
   }
@@ -179,12 +173,11 @@ export class Service {
     let { bucket, filter } = call.request;
 
     let subject = call.request.subject;
-    let api_key = call.request.api_key;
-    subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
     let resource: any = { bucket, filter };
     let acsResponse: AccessResponse;
     try {
       // target entity for ACS is bucket name here
+      Object.assign(resource, { subject });
       acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
         bucket, this);
     } catch (err) {
@@ -256,7 +249,7 @@ export class Service {
                       });
                     // map the s3 error codes to standard chassis-srv errors
                     if (err.code === 'NotFound') {
-                      err = new errors.NotFound('The specified key was not found');
+                      err = new errors.NotFound('Specified key does not exist');
                       err.code = 404;
                     }
                     if (!err.message) {
@@ -297,6 +290,10 @@ export class Service {
                 if (match && ownerInst && ownerValues.includes(ownerInst)) {
                   this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
                 }
+                // no scoping defined in the Rule
+                if (!ownerValues) {
+                  objectToReturn.push(object);
+                }
               }
             } else {
               this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
@@ -313,7 +310,9 @@ export class Service {
     // get gRPC call request
     const { bucket, key, download } = call.request;
     let subject = call.request.subject;
-    let api_key = call.request.api_key;
+    if (!subject) {
+      subject = {};
+    }
     // GET meta from stored object and query for accessReq with this meta
     if (!_.includes(this.buckets, bucket)) {
       return await call.end(new errors.InvalidArgument(`Invalid bucket name ${bucket}`));
@@ -330,7 +329,7 @@ export class Service {
         if (err) {
           // map the s3 error codes to standard chassis-srv errors
           if (err.code === 'NotFound') {
-            err = new errors.NotFound('The specified key was not found');
+            err = new errors.NotFound('Specified key does not exist');
             err.code = 404;
           }
           this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
@@ -348,7 +347,7 @@ export class Service {
           if (err) {
             // map the s3 error codes to standard chassis-srv errors
             if (err.code === 'NotFound') {
-              err = new errors.NotFound('The specified key was not found');
+              err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
             this.logger.error('Error occurred while retrieving metadata for key:',
@@ -367,8 +366,18 @@ export class Service {
     }
     // capture meta data from response message
     let metaObj;
-    if (headObject && headObject.Metadata && headObject.Metadata.meta) {
-      metaObj = JSON.parse(headObject.Metadata.meta);
+    let data = {};
+    let meta_subject = { id: '' };
+    if (headObject && headObject.Metadata) {
+      if (headObject.Metadata.meta) {
+        metaObj = JSON.parse(headObject.Metadata.meta);
+      }
+      if (headObject.Metadata.data) {
+        data = JSON.parse(headObject.Metadata.data);
+      }
+      if (headObject.Metadata.subject) {
+        meta_subject = JSON.parse(headObject.Metadata.subject);
+      }
     }
 
     // capture options from response headers
@@ -382,35 +391,6 @@ export class Service {
       }
       if (headObject.ContentType) {
         content_type = headObject.ContentType;
-        // get object tagging of the object stored in the S3 object storage
-        let objectTagging: any;
-        try {
-          objectTagging = await new Promise((resolve, reject) => {
-            this.ossClient.getObjectTagging(params, async (err: any, data) => {
-              if (err) {
-                // map the s3 error codes to standard chassis-srv errors
-                if (err.code === 'NotFound') {
-                  err = new errors.NotFound('The specified key was not found');
-                  err.code = 404;
-                }
-                this.logger.error('Error occurred while retrieving tags for key:',
-                  {
-                    Key: key, error: err, errorStack: err.stack
-                  });
-                await call.end(err);
-                return reject(err);
-              } else {
-                resolve(data);
-              }
-            });
-          });
-        } catch (err) {
-          this.logger.info('No object tagging found for key:',
-            {
-              Key: key, error: err, errorStack: err.stack
-            });
-        }
-
         // capture meta data from response message
         let metaObj;
         if (headObject && headObject.Metadata && headObject.Metadata.meta) {
@@ -454,14 +434,10 @@ export class Service {
 
 
       // Make ACS request with the meta object read from storage
-      if (!subject) {
-        subject = {};
-      }
       if (metaObj.owner && metaObj.owner[1]) {
         subject.scope = metaObj.owner[1].value;
       }
-      subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
-      let resource = { key, bucket, meta: metaObj };
+      let resource = { key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: AccessResponse;
       try {
         // target entity for ACS is bucket name here
@@ -506,7 +482,7 @@ export class Service {
           })
           .on('httpError', async (err: any) => {
             if (err.code === 'NotFound') {
-              err = new errors.NotFound('The specified key was not found');
+              err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
             // map the s3 error codes to standard chassis-srv errors
@@ -520,7 +496,7 @@ export class Service {
           .on('error', async (err: any) => {
             // map the s3 error codes to standard chassis-srv errors
             if (err.code === 'NotFound') {
-              err = new errors.NotFound('The specified key was not found');
+              err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
             this.logger.error('Error occurred while getting object',
@@ -568,10 +544,16 @@ export class Service {
     return resource;
   }
 
+  private unmarshallProtobufAny(msg: any): any {
+    if (msg && msg.value) {
+      return JSON.parse(msg.value.toString());
+    }
+  }
+
   async put(call: any, callback: any): Promise<PutResponse> {
     let stream = true;
     let completeBuffer = [];
-    let key, bucket, meta, object, options, subject, api_key;
+    let key, bucket, meta, object, options, subject;
 
     while (stream) {
       try {
@@ -591,7 +573,6 @@ export class Service {
         object = streamResponse.object;
         options = streamResponse.options;
         subject = streamResponse.subject;
-        api_key = streamResponse.api_key;
         // check object name
         if (!this.IsValidObjectName(key)) {
           stream = false;
@@ -613,8 +594,10 @@ export class Service {
     }
     if (!stream) {
       let response;
+      if (options && options.data) {
+        options.data = this.unmarshallProtobufAny(options.data);
+      }
       try {
-        subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
         let resource = { key, bucket, meta, options };
         this.createMetadata(resource, subject);
         // created meta if it was not provided in request
@@ -631,12 +614,17 @@ export class Service {
         if (acsResponse.decision != Decision.PERMIT) {
           throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
         }
+        let subjectID = '';
+        if (subject && subject.id) {
+          subjectID = subject.id;
+        }
         response = await this.storeObject(
           key,
           bucket,
           Buffer.concat(completeBuffer), // object
           meta,
-          options
+          options,
+          subjectID
         );
         return response;
       } catch (e) {
@@ -657,7 +645,6 @@ export class Service {
     let copyObjectResult;
 
     let subject = call.request.subject;
-    let api_key = call.request.api_key;
     let destinationSubjectScope; // scope for destination bucket
     if (subject && subject.scope) {
       destinationSubjectScope = subject.scope;
@@ -699,7 +686,7 @@ export class Service {
                   });
                 // map the s3 error codes to standard chassis-srv errors
                 if (err.code === 'NotFound') {
-                  err = new errors.NotFound('The specified key was not found');
+                  err = new errors.NotFound('Specified key does not exist');
                   err.code = 404;
                 }
                 if (!err.message) {
@@ -715,8 +702,18 @@ export class Service {
           throw err;
         }
         let metaObj;
-        if (headObject && headObject.Metadata && headObject.Metadata.meta) {
-          metaObj = JSON.parse(headObject.Metadata.meta);
+        let data = {};
+        let meta_subject = { id: '' };
+        if (headObject && headObject.Metadata) {
+          if (headObject.Metadata.meta) {
+            metaObj = JSON.parse(headObject.Metadata.meta);
+          }
+          if (headObject.Metadata.data) {
+            data = JSON.parse(headObject.Metadata.data);
+          }
+          if (headObject.Metadata.subject) {
+            meta_subject = JSON.parse(headObject.Metadata.subject);
+          }
         }
         if (!subject) {
           subject = {};
@@ -725,10 +722,9 @@ export class Service {
           // modifying the scope to check for read operation
           subject.scope = metaObj.owner[1].value;
         }
-        subject = await getSubjectFromRedis(subject, api_key, this.redisClient);
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
-        let resource = { key, sourceBucketName, meta: metaObj };
+        let resource = { key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
         let acsResponse: AccessResponse;
         try {
           // target entity for ACS is source bucket here
@@ -788,7 +784,15 @@ export class Service {
           params.Metadata = {
             meta: JSON.stringify(meta),
             key,
+            subject: JSON.stringify({ id: subject.id })
           };
+          // override data if it is provided
+          if (options.data) {
+            // params.Metadata.data = JSON.stringify(options.data);
+            params.Metadata.data = JSON.stringify(this.unmarshallProtobufAny(options.data));
+          } else {
+            params.Metadata.data = JSON.stringify(data);
+          }
 
           // 2. Add object metadata if provided
           // ContentEncoding
@@ -873,8 +877,10 @@ export class Service {
             }];
           }
           params.Metadata = {
+            data: JSON.stringify(data),
             meta: JSON.stringify(meta),
             key,
+            subject: JSON.stringify({ id: subject.id })
           };
 
           // 2. Add Object metadata
@@ -984,12 +990,23 @@ export class Service {
     return (allowedCharacters.test(key));
   }
 
-  private async storeObject(key: string, bucket: string, object: any, meta: any, options: Options): Promise<PutResponse> {
+  private async storeObject(key: string, bucket: string, object: any, meta: any,
+    options: Options, subjectID: string): Promise<PutResponse> {
     this.logger.info('Received a request to store Object:', { Key: key, Bucket: bucket });
     try {
-
+      let data = {};
+      if (options && options.data) {
+        data = options.data;
+      }
+      let subject = {};
+      if (subjectID) {
+        subject = { id: subjectID };
+      }
+      // only string data type can be stored in object metadata
       let metaData = {
         meta: JSON.stringify(meta),
+        data: JSON.stringify(data),
+        subject: JSON.stringify(subject),
         key,
       };
       // add stream of data into a readable stream
@@ -1084,24 +1101,12 @@ export class Service {
 
   async delete(call: Call<DeleteRequest>, context?: any): Promise<void> {
     const { bucket, key } = call.request;
-    let subject = await getSubjectFromRedis(call.request.subject, call.request.api_key, this.redisClient);
+    let subject = call.request.subject;
     if (!_.includes(this.buckets, bucket)) {
       throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
     }
 
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
-    const objectsList = await this.list(call);
-    let objectExists = false;
-    for (let object of objectsList) {
-      if (object.object_name.indexOf(key) > -1) {
-        objectExists = true;
-        break;
-      }
-    }
-    if (!objectExists) {
-      throw new errors.InvalidArgument('Invalid key name');
-    }
-
     let headObject: any;
     let resources = { Bucket: bucket, Key: key };
     try {
@@ -1111,7 +1116,7 @@ export class Service {
             this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
             // map the s3 error codes to standard chassis-srv errors
             if (err.code === 'NotFound') {
-              err = new errors.NotFound('The specified key was not found');
+              err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
             if (!err.message) {
@@ -1128,10 +1133,20 @@ export class Service {
     }
     // capture meta data from response message
     let metaObj;
-    if (headObject && headObject.Metadata && headObject.Metadata.meta) {
-      metaObj = JSON.parse(headObject.Metadata.meta);
+    let data = {};
+    let meta_subject = { id: '' };
+    if (headObject && headObject.Metadata) {
+      if (headObject.Metadata.meta) {
+        metaObj = JSON.parse(headObject.Metadata.meta);
+      }
+      if (headObject.Metadata.data) {
+        data = JSON.parse(headObject.Metadata.data);
+      }
+      if (headObject.Metadata.subject) {
+        meta_subject = JSON.parse(headObject.Metadata.subject);
+      }
     }
-    Object.assign(resources, { meta: metaObj });
+    Object.assign(resources, { meta: metaObj, data, subject: { id: meta_subject.id } });
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,

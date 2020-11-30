@@ -1,25 +1,26 @@
-import * as sconfig from '@restorecommerce/service-config';
+import { createServiceConfig } from '@restorecommerce/service-config';
 import * as _ from 'lodash';
 import { Events } from '@restorecommerce/kafka-client';
-import { Logger } from '@restorecommerce/logger';
+import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Service } from './service';
 import { OStorageCommandInterface } from './commandInterface';
 import { createClient } from 'redis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
+import { Logger } from 'winston';
 
 export class Worker {
   events: Events;
   server: any;
-  logger: chassis.Logger;
+  logger: Logger;
   cfg: any;
   topics: any;
   offsetStore: chassis.OffsetStore;
   authZ: ACSAuthZ;
   oss: Service;
   constructor(cfg?: any) {
-    this.cfg = cfg || sconfig(process.cwd());
-    this.logger = new Logger(this.cfg.get('logger'));
+    this.cfg = cfg || createServiceConfig(process.cwd());
+    this.logger = createLogger(this.cfg.get('logger'));
     this.topics = {};
   }
 
@@ -48,7 +49,7 @@ export class Worker {
     // init ACS cache
     initializeCache();
 
-    const oss = new Service(cfg, logger, this.authZ, redisClient);
+    const oss = new Service(cfg, logger, this.authZ);
     const cis = new OStorageCommandInterface(server, cfg, logger, events, redisClient);
     this.oss = oss;
 
@@ -83,6 +84,12 @@ export class Worker {
     const transport = server.transport[transportName];
     const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
     await server.bind(reflectionServiceName, reflectionService);
+
+    await server.bind(serviceNamesCfg.health, new chassis.Health(cis, {
+      logger,
+      cfg,
+      dependencies: ['acs-srv'],
+    }));
 
     // Start server
     await oss.start();

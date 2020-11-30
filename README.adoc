@@ -4,9 +4,11 @@ https://travis-ci.org/restorecommerce/ostorage-srv?branch=master[image:http://im
 https://david-dm.org/restorecommerce/ostorage-srv[image:https://img.shields.io/david/restorecommerce/ostorage-srv.svg?style=flat-square[Dependencies]]
 https://coveralls.io/github/restorecommerce/ostorage-srv?branch=master[image:http://img.shields.io/coveralls/restorecommerce/ostorage-srv/master.svg?style=flat-square[Cover]]
 
-A microservice for object storage  part of the link:https://github.com/restorecommerce[Restorecommerce].
+A microservice for object storage.
 
 Please consult the documentation for using it:
 
 - *link:https://docs.restorecommerce.io/ostorage-srv/index.html[Usage]*
 - *link:https://docs.restorecommerce.io/architecture/index.html[General Architecture]*
+
+Part of link:https://github.com/restorecommerce[Restorecommerce].

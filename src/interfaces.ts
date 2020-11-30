@@ -1,4 +1,4 @@
-import { Subject, ApiKeyValue } from '@restorecommerce/acs-client';
+import { Subject } from '@restorecommerce/acs-client';
 
 export enum Operation {
   GT = 'gt',
@@ -25,6 +25,7 @@ export interface Options {
   version?: string;
   md5?: string;
   tags?: Attribute[];
+  data?: any;
 }
 
 export interface FilterType {
@@ -52,7 +53,6 @@ export interface ListRequest {
   bucket: string;
   filter: FilterType;
   subject?: Subject;
-  api_key?: ApiKeyValue;
 }
 
 export interface DeleteRequest {
@@ -60,7 +60,6 @@ export interface DeleteRequest {
   bucket: string;
   filter: FilterType;
   subject?: Subject;
-  api_key?: ApiKeyValue;
 }
 
 export interface PutRequest {

@@ -2,7 +2,7 @@ import * as should from 'should';
 import { Worker } from '../lib/worker';
 import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import * as sconfig from '@restorecommerce/service-config';
+import { createServiceConfig } from '@restorecommerce/service-config';
 import * as sleep from 'sleep';
 import * as fs from 'fs';
 import { startGrpcMockServer, bucketPolicySetRQ, stopGrpcMockServer, permitCreateObjRule, denyCreateObjRule } from './utils';
@@ -50,7 +50,7 @@ let meta = {
 };
 
 async function start(): Promise<void> {
-  cfg = sconfig(process.cwd() + '/test');
+  cfg = createServiceConfig(process.cwd() + '/test');
   worker = new Worker(cfg);
   await worker.start();
 }
@@ -295,8 +295,8 @@ describe('testing ostorage-srv with ACS enabled', () => {
       sleep.sleep(3);
     });
     it('With invalid subject scope should throw an error when listing object', async () => {
-       // make sub id invalid so that data is not read from ACS cache
-       subject.id = 'invalid_subject_id_2';
+      // make sub id invalid so that data is not read from ACS cache
+      subject.id = 'invalid_subject_id_2';
       let result = await oStorage.list({
         bucket: 'test',
         subject
@@ -313,9 +313,8 @@ describe('testing ostorage-srv with ACS enabled', () => {
         key: 'config_acs_enabled.json',
         subject
       });
-      // NOTE: before deleting the object is read to make sure it exists, so we get a read error
       should.exist(result.error);
-      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:invalid_subject_id_3, resource:test, action:READ, target_scope:orgD; the response was DENY');
+      result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:invalid_subject_id_3, resource:test, action:DELETE, target_scope:orgD; the response was DENY');
       sleep.sleep(3);
     });
     it('With invalid scope should throw an error when replacing the object', async () => {
@@ -532,7 +531,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       response.tags[1].value.should.equal('value_2');
 
       // check length
-      response.length.should.equal(9034);
+      response.length.should.equal(9382);
 
       sleep.sleep(3);
     });

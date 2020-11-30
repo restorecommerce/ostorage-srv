@@ -1,3 +1,35 @@
+### 0.1.9 (November 19th, 2020)
+
+- update to remove subject-id and pass token to acs-client
+- updated dependencies
+
+### 0.1.8 (November 5th, 2020)
+
+- fix copy operation to store options data in meta object
+- removed listObjects check for delete operation and fix list objects when no scoping defined in rules
+
+### 0.1.7 (October 19th, 2020)
+
+- updated chassis-srv
+- add acs-srv readiness check
+- updated acs-client
+
+### 0.1.6 (October 14th, 2020)
+
+- add new grpc healthcheck with readiness probe
+- listen on 0.0.0.0 for grpc port
+- changes to store data (google.protobuf.Any meta data) to metaObject and also the subject_id, removed duplicate object tags reading
+- up dependencies
+
+### 0.1.5 (October 9th, 2020)
+
+- up acs-client includes fix for validation of subID and token
+
+### 0.1.4 (October 3rd, 2020)
+
+- restructured protos
+- updated acs-client
+
 ### 0.1.3 (September 9th, 2020)
 
 - updated acs-client and protos
