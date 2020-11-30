@@ -202,13 +202,6 @@
       }
     }
   },
-  "urns": {
-    "roleScopingEntity": "urn:restorecommerce:acs:names:model:entity",
-    "roleScopingInstance": "urn:oasis:names:tc:xacml:1.0:resource:resource-id",
-    "organizationUrn": "urn:restorecommerce:acs:model:organization.Organization",
-    "ownerIndicatoryEntity": "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
-    "ownerIndicatoryInstance": "urn:restorecommerce:acs:names:ownerInstance"
-  },
   "server": {
     "services": {
       "io-restorecommerce-ostorage-srv": {
