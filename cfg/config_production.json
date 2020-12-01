@@ -60,5 +60,10 @@
         ]
       }
     }
+  },
+  "authorization": {
+    "cache":  {
+      "host": "redis"
+    }
   }
 }

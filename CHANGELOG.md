@@ -1,3 +1,7 @@
+### 0.1.10 (December 1st, 2020)
+
+- fix production redis auth cache address
+
 ### 0.1.9 (November 19th, 2020)
 
 - update to remove subject-id and pass token to acs-client
