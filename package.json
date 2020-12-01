@@ -64,6 +64,7 @@
     "mocha": "cross-env NODE_ENV=test mocha --timeout 15000 -R spec test/test.js --full-trace --exit",
     "tsctests": "tsc -d -p tsconfig.test.json",
     "test-debug": "cross-env NODE_ENV=test mocha -R spec test/test.js --inspect-brk",
+    "lcov-report": "nyc report --reporter=lcov",
     "coveralls": "nyc report --reporter=text-lcov | coveralls",
     "createtopics": "node setupTopics.js io.restorecommerce.command",
     "build:tsc": "tsc -d",
