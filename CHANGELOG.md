@@ -1,3 +1,7 @@
+### 0.1.11 (December 2nd, 2020)
+
+- fix docker image permissions
+
 ### 0.1.10 (December 1st, 2020)
 
 - fix production redis auth cache address
