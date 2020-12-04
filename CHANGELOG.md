@@ -1,3 +1,7 @@
+### 0.1.11 (December 4th, 2020)
+
+- up acs-client which includes fix to set unauthenticated to true when subject does not exist
+
 ### 0.1.11 (December 2nd, 2020)
 
 - fix docker image permissions
