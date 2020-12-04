@@ -1,4 +1,8 @@
-### 0.1.11 (December 4th, 2020)
+### 0.1.13 (December 4th, 2020)
+
+- fix acs-client for filter boolean condition
+
+### 0.1.12 (December 4th, 2020)
 
 - up acs-client which includes fix to set unauthenticated to true when subject does not exist
 
