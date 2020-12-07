@@ -1,6 +1,5 @@
 import * as _ from 'lodash';
 import * as aws from 'aws-sdk';
-import * as MemoryStream from 'memorystream';
 import { PassThrough, Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
@@ -456,9 +455,7 @@ export class Service {
 
       // retrieve object from Amazon S3
       // and create stream from it
-      const stream = new MemoryStream(null);
       const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
-      stream.pipe(downloadable);
 
       // write data to gRPC call
       await new Promise<any>((resolve, reject) => {
