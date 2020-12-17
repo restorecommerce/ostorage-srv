@@ -433,8 +433,22 @@ export class Service {
 
 
       // Make ACS request with the meta object read from storage
-      if (metaObj.owner && metaObj.owner[1]) {
+      // When uploading files from the minio console the objects
+      // have no meta stored so first check if meta is defined
+      // before making the ACS request
+      if (
+        !_.isEmpty(metaObj) &&
+        !_.isEmpty(metaObj.owner) &&
+        !_.isEmpty(metaObj.owner[1]) &&
+        !_.isEmpty(metaObj.owner[1].value)
+      ) {
         subject.scope = metaObj.owner[1].value;
+      } else {
+        let err = new errors.NotFound('404 not found');
+        this.logger.error('Error occurred while getting object', {
+          Key: key, error: err
+        });
+        return await call.end(err);
       }
       let resource = { key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: AccessResponse;
@@ -467,15 +481,15 @@ export class Service {
             await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
           })
           .on('httpDone', async () => {
-            resolve();
+            resolve(undefined);
           })
           .on('end', async (chunk) => {
             await call.end();
-            resolve();
+            resolve(undefined);
           })
           .on('finish', async (chunk) => {
             await call.end();
-            resolve();
+            resolve(undefined);
           })
           .on('httpError', async (err: any) => {
             if (err.code === 'NotFound') {
