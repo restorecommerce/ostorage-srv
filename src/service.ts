@@ -448,7 +448,6 @@ export class Service {
         this.logger.error('Error occurred while getting object', {
           Key: key, error: err
         });
-        return await call.end(err);
       }
       let resource = { key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: AccessResponse;
