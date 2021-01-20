@@ -69,7 +69,7 @@ is `io.restorecommerce.ostorage.Response` message.
 | key | string | required | Object Key.
 | meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | metadata attached to Object.
 | options | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.ostorage.Options`] | optional | headers attached to Object.
-|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|subject |`io.restorecommerce.auth.Subject` |required |Subject details
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.Options`
@@ -115,7 +115,7 @@ Requests are performed using `io.restorecommerce.ostorage.GetRequest` protobuf m
 | bucket | string | required | Bucket to which the object is mapped to
 | flag | boolean | optional | If flag is set to `true` only metadata of object is fetched
 | download | boolean | optional | If flag is set to `true` then Content-Disposition is set as `attachment` else is set as `inline`
-|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|subject |`io.restorecommerce.auth.Subject` |required |Subject details
 |==============================================================================================================================================
 
 [#api_ostorage_list]
@@ -131,7 +131,7 @@ Requests are performed using `io.restorecommerce.ostorage.ListRequest` protobuf 
 | Field | Type | Label | Description
 | bucket | string | optional | If bucket name provied it will return its files otherwise it will return all files
 | filter | google.protobuf.Struct | optional | Filter based on fieldName, operation, value
-|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|subject |`io.restorecommerce.auth.Subject` |required |Subject details
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.ObjectsData`
@@ -165,7 +165,7 @@ Requests are performed using `io.restorecommerce.ostorage.Bucket` protobuf messa
 | Field | Type | Label | Description
 | bucket | string | required | Bucket to which the object is mapped to
 | key | string | required | Object key
-|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|subject |`io.restorecommerce.auth.Subject` |required |Subject details
 |==============================================================================================================================================
 
 [#api_ostorage_copy]
@@ -188,7 +188,7 @@ is specified in the `io.restorecommerce.ostorage.CopyRequest` and if tagging is 
 |==============================================================================================================================================
 | Field | Type | Label | Description
 | items | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`[\] io.restorecommerce.ostorage.CopyRequestItem`] | required | List of objects to be copied
-|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|subject |`io.restorecommerce.auth.Subject` |required |Subject details
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.CopyResponse`
