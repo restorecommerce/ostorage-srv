@@ -996,7 +996,7 @@ export class Service {
   // only characters described as safe to use in the Amazon S3
   // Object Key Naming Guidelines
   private IsValidObjectName(key: string): boolean {
-    const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()/]+$');
+    const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()@/]+$');
     return (allowedCharacters.test(key));
   }
 
@@ -1079,14 +1079,14 @@ export class Service {
             this.logger.error('Error:', err.code, err.message);
             reject(err);
           } else {
+            uploadable.on('httpUploadProgress', (chunk) => {
+              if (chunk.loaded == chunk.total) {
+                this.logger.info(`Successfully persisted object ${key}
+                              in bucket ${bucket}`);
+                resolve(data);
+              }
+            });
             resolve(data);
-          }
-        });
-        uploadable.on('httpUploadProgress', (chunk) => {
-          if (chunk.loaded == chunk.total) {
-            this.logger.info(`Successfully persisted object ${key}
-                        in bucket ${bucket}`);
-            resolve(true);
           }
         });
       });
@@ -1105,7 +1105,7 @@ export class Service {
         {
           Key: key, Bucket: bucket, error: err, errStack: err.stack
         });
-      return (err);
+      throw err;
     }
   }
 

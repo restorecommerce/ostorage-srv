@@ -1,3 +1,11 @@
+### 0.1.16 (January 28th, 2021)
+
+- fixed put api for error handling
+
+### 0.1.15 (December 17th, 2020)
+
+- handle error when object meta is not found
+
 ### 0.1.14 (December 4th, 2020)
 
 - protos (last_login updated on token)
