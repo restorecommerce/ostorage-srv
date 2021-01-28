@@ -57,7 +57,8 @@ This microservice exposes the following gRPC endpoints:
 
 Used to store the Object to the Storage Server.
 Requests are performed using `io.restorecommerce.ostorage.Object` protobuf message as input and response
-is `io.restorecommerce.ostorage.Response` message.
+is `io.restorecommerce.ostorage.Response` message. For Object key characters described as safe to use in the https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html[S3
+Object Key Naming Guidelines] are allowed.
 
 `io.restorecommerce.ostorage.Object`
 
