@@ -308,7 +308,7 @@ export class Service {
 
     // get gRPC call request
     const { bucket, key, download } = call.request.request;
-    let subject = call.request.subject;
+    let subject = call.request.reqeust.subject;
     if (!subject) {
       subject = {};
     }
