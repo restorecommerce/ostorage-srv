@@ -307,7 +307,7 @@ export class Service {
   async get(call: any, context?: any): Promise<any> {
 
     // get gRPC call request
-    const { bucket, key, download } = call.request;
+    const { bucket, key, download } = call.request.request;
     let subject = call.request.subject;
     if (!subject) {
       subject = {};
@@ -430,8 +430,6 @@ export class Service {
       }
 
       const optionsObj: Options = { encoding, content_type, content_language, content_disposition, length, version, md5, tags };
-
-
       // Make ACS request with the meta object read from storage
       // When uploading files from the minio console the objects
       // have no meta stored so first check if meta is defined
@@ -470,16 +468,25 @@ export class Service {
       // and create stream from it
       const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
 
-      // write data to gRPC call
+      // TODO: need to check for chaining streams then we do not need to wait for drain and write response
+      // back-pressure handle - wait for drain event before resuming read operation
+      call.request.on('drain', () => {
+        // thiz.logger.debug('Drain event received, resuming readable stream');
+        downloadable.resume();
+      });
+
       await new Promise<any>((resolve, reject) => {
         downloadable
           .on('httpData', async (chunk) => {
             await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
           })
           .on('data', async (chunk) => {
-            await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
-          })
-          .on('httpDone', async () => {
+            let writeResp = await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
+            if (!writeResp) {
+              // thiz.logger.debug('Write response is false, pausing readeable stream');
+              downloadable.pause();
+            }
+          }).on('httpDone', async () => {
             resolve(undefined);
           })
           .on('end', async (chunk) => {
