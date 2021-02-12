@@ -568,86 +568,157 @@ export class Service {
   }
 
   async put(call: any, callback: any): Promise<PutResponse> {
-    let stream = true;
-    let completeBuffer = [];
-    let key, bucket, meta, object, options, subject;
-
-    while (stream) {
-      try {
-        let streamRequest = await call.read();
-        // Promisify callback to get response
-        const streamResponse: any = await new Promise((resolve, reject) => {
-          streamRequest((err, response) => {
-            if (err) {
-              reject(err);
-            }
-            resolve(response);
-          });
-        });
-        bucket = streamResponse.bucket;
-        key = streamResponse.key;
-        meta = streamResponse.meta;
-        object = streamResponse.object;
-        options = streamResponse.options;
-        subject = streamResponse.subject;
-        // check object name
-        if (!this.IsValidObjectName(key)) {
-          stream = false;
-          throw new errors.InvalidArgument(`Invalid Object name ${key}`);
-        }
-        if (!_.includes(this.buckets, bucket)) {
-          stream = false;
-          throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
-        }
-
-        completeBuffer.push(object);
-      } catch (e) {
-        stream = false;
-        if (e.message != 'stream end') {
-          this.logger.error('Error occurred while storing object...', e);
-          throw e;
-        }
+    let key, bucket, meta, options, subject;
+    let streamRequest = await call.getServerRequestStream();
+    const readable = new Readable({ read() { } });
+    streamRequest.on('data', (data) => {
+      bucket = data.bucket;
+      key = data.key;
+      meta = data.meta;
+      options = data.options;
+      subject = data.subject;
+      // add stream of data into a readable stream
+      if (data.object) {
+        readable.push(data.object);
       }
+      // check object name
+      if (!this.IsValidObjectName(key)) {
+        throw new errors.InvalidArgument(`Invalid Object name ${key}`);
+      }
+      if (!_.includes(this.buckets, bucket)) {
+        throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
+      }
+    });
+
+    streamRequest.on('end', () => {
+      // end of readable stream
+      readable.push(null);
+    });
+
+    let response;
+    if (options && options.data) {
+      options.data = this.unmarshallProtobufAny(options.data);
     }
-    if (!stream) {
-      let response;
-      if (options && options.data) {
-        options.data = this.unmarshallProtobufAny(options.data);
-      }
+    try {
+      // pause till first chunk is received to make ACS request
+      await new Promise((resolve: any, reject) => {
+        if (!bucket || !key) {
+          streamRequest.on('data', (data) => {
+            key = data.key;
+            meta = data.meta;
+            options = data.options;
+            subject = data.subject;
+            resolve();
+          });
+        }
+      });
+      let resource = { key, bucket, meta, options };
+      this.createMetadata(resource, subject);
+      // created meta if it was not provided in request
+      meta = resource.meta;
+      let acsResponse: AccessResponse;
       try {
-        let resource = { key, bucket, meta, options };
-        this.createMetadata(resource, subject);
-        // created meta if it was not provided in request
-        meta = resource.meta;
-        let acsResponse: AccessResponse;
-        try {
-          // target entity for ACS is bucket name here
-          acsResponse = await checkAccessRequest(subject, resource, AuthZAction.CREATE,
-            bucket, this);
-        } catch (err) {
-          this.logger.error('Error occurred requesting access-control-srv:', err);
-          throw err;
-        }
-        if (acsResponse.decision != Decision.PERMIT) {
-          throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
-        }
-        let subjectID = '';
-        if (subject && subject.id) {
-          subjectID = subject.id;
-        }
-        response = await this.storeObject(
-          key,
-          bucket,
-          Buffer.concat(completeBuffer), // object
-          meta,
-          options,
-          subjectID
-        );
-        return response;
-      } catch (e) {
-        this.logger.error('Error occurred while storing object.', e);
-        throw e; // if you throw without a catch block you get an error
+        // target entity for ACS is bucket name here
+        acsResponse = await checkAccessRequest(subject, resource, AuthZAction.CREATE,
+          bucket, this);
+      } catch (err) {
+        this.logger.error('Error occurred requesting access-control-srv:', err);
+        throw err;
       }
+      if (acsResponse.decision != Decision.PERMIT) {
+        throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      }
+      let subjectID = '';
+      if (subject && subject.id) {
+        subjectID = subject.id;
+      }
+      response = await this.storeObject(
+        key,
+        bucket,
+        readable, // readable stream
+        meta,
+        options,
+        subjectID
+      );
+      return response;
+    } catch (e) {
+      this.logger.error('Error occurred while storing object.', e);
+      throw e; // if you throw without a catch block you get an error
+    }
+  }
+
+  private async storeObject(key: string, bucket: string, readable: Readable, meta: any,
+    options: Options, subjectID: string): Promise<PutResponse> {
+    this.logger.info('Received a request to store Object:', { Key: key, Bucket: bucket });
+    try {
+      let data = {};
+      if (options && options.data) {
+        data = options.data;
+      }
+      let subject = {};
+      if (subjectID) {
+        subject = { id: subjectID };
+      }
+      // only string data type can be stored in object metadata
+      let metaData = {
+        meta: JSON.stringify(meta),
+        data: JSON.stringify(data),
+        subject: JSON.stringify(subject),
+        key,
+      };
+      // get object length
+      // let length: number;
+      // length = readable.readableLength;
+
+      // convert array of tags to query parameters
+      // required by AWS.S3
+      let TaggingQueryParams = '';
+      let tagId: string, tagVal: string;
+      if (options && options.tags) {
+        let tags = options.tags;
+        for (const [i, v] of tags.entries()) {
+          tagId = v.id;
+          tagVal = v.value;
+          if (i < tags.length - 1) {
+            TaggingQueryParams += tagId + '=' + tagVal + '&';
+          } else {
+            TaggingQueryParams += tagId + '=' + tagVal;
+          }
+        }
+      }
+      // write headers to the S3 object
+      if (!options) {
+        options = {};
+      }
+      const result = await new Promise((resolve, reject) => {
+        this.ossClient.upload({
+          Key: key,
+          Bucket: bucket,
+          Body: readable,
+          Metadata: metaData,
+          // options:
+          ContentEncoding: options.encoding,
+          ContentType: options.content_type,
+          ContentLanguage: options.content_language,
+          ContentDisposition: options.content_disposition,
+          Tagging: TaggingQueryParams // this param looks like 'key1=val1&key2=val2'
+        }, (err, data) => {
+          if (err) {
+            this.logger.error('Error occurred while storing object',
+              {
+                Key: key, Bucket: bucket, error: err, errStack: err.stack
+              });
+            throw err;
+          } else {
+            resolve(data);
+          }
+        });
+      });
+      const url = `//${bucket}/${key}`;
+      const tags = options && options.tags;
+      return { key, bucket, url, meta, tags };
+    } catch (err) {
+      throw err;
     }
   }
 
@@ -1005,115 +1076,6 @@ export class Service {
   private IsValidObjectName(key: string): boolean {
     const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()@/]+$');
     return (allowedCharacters.test(key));
-  }
-
-  private async storeObject(key: string, bucket: string, object: any, meta: any,
-    options: Options, subjectID: string): Promise<PutResponse> {
-    this.logger.info('Received a request to store Object:', { Key: key, Bucket: bucket });
-    try {
-      let data = {};
-      if (options && options.data) {
-        data = options.data;
-      }
-      let subject = {};
-      if (subjectID) {
-        subject = { id: subjectID };
-      }
-      // only string data type can be stored in object metadata
-      let metaData = {
-        meta: JSON.stringify(meta),
-        data: JSON.stringify(data),
-        subject: JSON.stringify(subject),
-        key,
-      };
-      // add stream of data into a readable stream
-      const readable = new Readable();
-      readable.push(object);
-      readable.push(null);
-      // create writable stream in which we pipe the readable stream
-      const passStream = new PassThrough();
-      // get object length
-      let length: number;
-      length = readable.readableLength;
-
-      // convert array of tags to query parameters
-      // required by AWS.S3
-      let TaggingQueryParams = '';
-      let tagId: string, tagVal: string;
-      if (options && options.tags) {
-        let tags = options.tags;
-        for (const [i, v] of tags.entries()) {
-          tagId = v.id;
-          tagVal = v.value;
-          if (i < tags.length - 1) {
-            TaggingQueryParams += tagId + '=' + tagVal + '&';
-          } else {
-            TaggingQueryParams += tagId + '=' + tagVal;
-          }
-        }
-      }
-      // write headers to the S3 object
-      if (!options) {
-        options = {};
-      }
-      const uploadable = this.ossClient.upload({
-        Key: key,
-        Bucket: bucket,
-        Body: passStream,
-        Metadata: metaData,
-        // options:
-        ContentEncoding: options.encoding,
-        ContentType: options.content_type,
-        ContentLanguage: options.content_language,
-        ContentDisposition: options.content_disposition,
-        Tagging: TaggingQueryParams // this param looks like 'key1=val1&key2=val2'
-      }, (err, data) => {
-        if (err) {
-          this.logger.error('Error occurred while storing object',
-            {
-              Key: key, Bucket: bucket, error: err, errStack: err.stack
-            });
-          throw err;
-        } else {
-          return data;
-        }
-      });
-      readable.pipe(passStream);
-
-      const output = await new Promise<any>((resolve, reject) => {
-        uploadable.send((err, data) => {
-          if (err) {
-            this.logger.error('Error:', err.code, err.message);
-            reject(err);
-          } else {
-            uploadable.on('httpUploadProgress', (chunk) => {
-              if (chunk.loaded == chunk.total) {
-                this.logger.info(`Successfully persisted object ${key}
-                              in bucket ${bucket}`);
-                resolve(data);
-              }
-            });
-            resolve(data);
-          }
-        });
-      });
-      if (output) {
-        const url = `//${bucket}/${key}`;
-        const tags = options && options.tags;
-        return { key, bucket, url, meta, tags, length };
-      } else {
-        this.logger.error('No output returned when trying to store object',
-          {
-            Key: key, Bucket: bucket
-          });
-      }
-    } catch (err) {
-      this.logger.error('Error occurred while storing object',
-        {
-          Key: key, Bucket: bucket, error: err, errStack: err.stack
-        });
-      throw err;
-    }
   }
 
   async delete(call: Call<DeleteRequest>, context?: any): Promise<void> {
