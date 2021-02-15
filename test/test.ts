@@ -176,22 +176,16 @@ describe('testing ostorage-srv with ACS enabled', () => {
         bucket: 'test',
         subject
       });
-      let result;
-      result = await call.read();
-      result = await new Promise((resolve, reject) => {
-        result((err, response) => {
-          if (err) {
-            reject(err);
-          }
-          resolve(response);
-        });
+
+      let grpcStream = call.getResponseStream();
+      grpcStream.on('data', (data) => {
+        should.exist(data);
+        should.exist(data.key);
+        should.exist(data.url);
+        should.exist(data.object);
+        data.url.should.equal('//test/config_acs_enabled.json');
+        meta.owner.should.deepEqual(data.meta.owner);
       });
-      should.exist(result);
-      should.exist(result.key);
-      should.exist(result.url);
-      should.exist(result.object);
-      result.url.should.equal('//test/config_acs_enabled.json');
-      meta.owner.should.deepEqual(result.meta.owner);
       sleep.sleep(3);
     });
     it('With valid subject scope should be able to list the object', async () => {
@@ -264,34 +258,15 @@ describe('testing ostorage-srv with ACS enabled', () => {
         bucket: 'test',
         subject
       });
-      let streamResponse = true;
-      let streamData = {
-        key: '', object: {}, url: '', error: { code: null, message: null }
-      };
-      let streamBuffer = [];
-      let result;
-      try {
-        while (streamResponse) {
-          result = await call.read();
-          result = await new Promise((resolve, reject) => {
-            result((err, response) => {
-              if (err) {
-                reject(err);
-              }
-              resolve(response);
-            });
-          });
-          streamData.key = result.key;
-          streamData.url = result.url;
-          if (result.error) {
-            streamData.error = result.error;
-          }
-          streamBuffer.push(result.object);
-        }
-      } catch (err) {
+      const grpcRespStream = await call.getResponseStream();
+      grpcRespStream.on('data', (data) => {
+        // no data received
+        should.not.exist(data);
+      });
+      grpcRespStream.on('errorResolved', (err) => {
         should.exist(err.details);
         err.details.should.equal('Access not allowed for request with subject:invalid_subject_id_1, resource:test, action:READ, target_scope:orgC; the response was DENY');
-      }
+      });
       sleep.sleep(3);
     });
     it('With invalid subject scope should throw an error when listing object', async () => {
@@ -430,15 +405,13 @@ describe('testing ostorage-srv with ACS disabled', () => {
       should(result.data.object_data).empty;
     });
 
-    it('Should return an error if an invalid object name is used', async () => {
+    it('Should return an error if an invalid object name is used when storing object', async () => {
       // create streaming client request
       const clientConfig = cfg.get('grpc-client:service-ostorage');
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
       const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
       const call = await put();
       const readStream = fs.createReadStream('./test/cfg/config.json');
-
-      let streamRequest;
       readStream.on('data', async (chunk) => {
         const data = {
           bucket: 'test',
@@ -450,19 +423,11 @@ describe('testing ostorage-srv with ACS disabled', () => {
         await call.write(data);
       });
 
-
-      streamRequest = await call.end((err, data) => {
-        if (err) {
-          return err;
-        } else {
-          return data;
-        }
-      });
-
       await new Promise(async (resolve, reject) => {
         readStream.on('end', async () => {
+          let streamingRequest = await call.end();
           const streamingResponse = await new Promise((resolve, reject) => {
-            streamRequest((err, data) => {
+            streamingRequest((err, data) => {
               if (err) {
                 should.exist(err.message);
                 err.details.should.equal('Invalid Object name config{}.json');
@@ -493,7 +458,8 @@ describe('testing ostorage-srv with ACS disabled', () => {
           key: 'config.json',
           object: chunk,
           meta,
-          options
+          options,
+          subject: { scope: 'orgC' }
         };
         await call.write(data);
       });
@@ -531,7 +497,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       response.tags[1].value.should.equal('value_2');
 
       // check length
-      response.length.should.equal(9382);
+      response.length.should.equal(10023);
 
       sleep.sleep(3);
     });
@@ -544,21 +510,14 @@ describe('testing ostorage-srv with ACS disabled', () => {
         key: 'config.json',
         bucket: 'test'
       });
-      let result;
-      result = await call.read();
-      result = await new Promise((resolve, reject) => {
-        result((err, response) => {
-          if (err) {
-            reject(err);
-          }
-          resolve(response);
-        });
+      const grpcRespStream = await call.getResponseStream();
+      grpcRespStream.on('data', (data) => {
+        should.exist(data);
+        should.exist(data.key);
+        should.exist(data.url);
+        should.exist(data.object);
+        meta.owner.should.deepEqual(data.meta.owner);
       });
-      should.exist(result);
-      should.exist(result.key);
-      should.exist(result.url);
-      should.exist(result.object);
-      meta.owner.should.deepEqual(result.meta.owner);
       sleep.sleep(3);
     });
 
@@ -570,42 +529,28 @@ describe('testing ostorage-srv with ACS disabled', () => {
         key: 'config.json',
         bucket: 'test'
       });
-      let streamResponse = true;
       let streamData = {
         key: '', object: {}, url: '', error: { code: null, message: null }
       };
       let streamBuffer = [];
-      let result;
       try {
-        while (streamResponse) {
-          result = await call.read();
-          result = await new Promise((resolve, reject) => {
-            result((err, response) => {
-              if (err) {
-                reject(err);
-              }
-              resolve(response);
-            });
-          });
-          streamData.key = result.key;
-          streamData.url = result.url;
-          if (result.error) {
-            streamData.error = result.error;
-          }
-          streamBuffer.push(result.object);
-        }
+        const grpcRespStream = await call.getResponseStream();
+        grpcRespStream.on('data', (data) => {
+          streamData.key = data.key;
+          streamData.url = data.url;
+          streamBuffer.push(data.object);
+          should.exist(streamData);
+          should.exist(streamData.object);
+          should.exist(streamData.key);
+          should.exist(streamData.url);
+          streamData.key.should.equal('config.json');
+        });
       } catch (err) {
-        streamResponse = false;
         if (err.message === 'stream end') {
           logger.info('readable stream ended.');
         }
       }
       streamData.object = Buffer.concat(streamBuffer);
-      should.exist(streamData);
-      should.exist(streamData.object);
-      should.exist(streamData.key);
-      should.exist(streamData.url);
-      streamData.key.should.equal('config.json');
       sleep.sleep(3);
     });
 

@@ -582,13 +582,6 @@ export class Service {
       if (data.object) {
         readable.push(data.object);
       }
-      // check object name
-      if (!this.IsValidObjectName(key)) {
-        throw new errors.InvalidArgument(`Invalid Object name ${key}`);
-      }
-      if (!_.includes(this.buckets, bucket)) {
-        throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
-      }
     });
 
     streamRequest.on('end', () => {
@@ -612,6 +605,15 @@ export class Service {
           });
         }
       });
+
+      // validate object name and bucket
+      if (!this.IsValidObjectName(key)) {
+        throw new errors.InvalidArgument(`Invalid Object name ${key}`);
+      }
+      if (!_.includes(this.buckets, bucket)) {
+        throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
+      }
+
       let resource = { key, bucket, meta, options };
       this.createMetadata(resource, subject);
       // created meta if it was not provided in request
