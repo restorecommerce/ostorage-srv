@@ -20,14 +20,16 @@ export class Service {
   authZ: ACSAuthZ;
   cfg: any;
   authZCheck: boolean;
+  idsService: any;
 
-  constructor(cfg: any, private logger: any, authZ: ACSAuthZ) {
+  constructor(cfg: any, private logger: any, authZ: ACSAuthZ, idsService: any) {
     this.ossClient = new aws.S3(cfg.get('s3:client'));
     this.buckets = cfg.get('s3:buckets') || [];
     this.bucketsLifecycleConfigs = cfg.get('s3.bucketsLifecycleConfigs');
     this.authZ = authZ;
     this.cfg = cfg;
     this.authZCheck = cfg.get('authorization:enabled');
+    this.idsService = idsService;
   }
 
   async start(): Promise<void> {
@@ -574,7 +576,6 @@ export class Service {
     streamRequest.on('data', (data) => {
       bucket = data.bucket;
       key = data.key;
-      meta = data.meta;
       options = data.options;
       subject = data.subject;
       // add stream of data into a readable stream
@@ -605,7 +606,6 @@ export class Service {
         if (!bucket || !key) {
           streamRequest.on('data', (data) => {
             key = data.key;
-            meta = data.meta;
             options = data.options;
             subject = data.subject;
             resolve();
@@ -629,6 +629,10 @@ export class Service {
         throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
       }
       let subjectID = '';
+      if (subject && subject.token && !subject.id) {
+        const dbSubject = await this.idsService.findByToken({ token: subject.token });
+        subjectID = dbSubject?.data?.id;
+      }
       if (subject && subject.id) {
         subjectID = subject.id;
       }
@@ -667,8 +671,8 @@ export class Service {
         key,
       };
       // get object length
-      // let length: number;
-      // length = readable.readableLength;
+      let length: number;
+      length = readable.readableLength;
 
       // convert array of tags to query parameters
       // required by AWS.S3
@@ -714,9 +718,17 @@ export class Service {
           }
         });
       });
-      const url = `//${bucket}/${key}`;
-      const tags = options && options.tags;
-      return { key, bucket, url, meta, tags };
+
+      if (result) {
+        const url = `//${bucket}/${key}`;
+        const tags = options && options.tags;
+        return { key, bucket, url, meta, tags, length };
+      } else {
+        this.logger.error('No output returned when trying to store object',
+          {
+            Key: key, Bucket: bucket
+          });
+      }
     } catch (err) {
       throw err;
     }

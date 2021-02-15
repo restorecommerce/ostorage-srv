@@ -8,6 +8,7 @@ import { OStorageCommandInterface } from './commandInterface';
 import { createClient } from 'redis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import { Logger } from 'winston';
+import { Client } from '@restorecommerce/grpc-client';
 
 export class Worker {
   events: Events;
@@ -49,7 +50,12 @@ export class Worker {
     // init ACS cache
     initializeCache();
 
-    const oss = new Service(cfg, logger, this.authZ);
+    // init ids-client to lookup token in case subject does not contain id
+    const idsClientCfg = cfg.get('client:user');
+    const idsClient = new Client(idsClientCfg, logger);
+    const idsService = await idsClient.connect();
+
+    const oss = new Service(cfg, logger, this.authZ, idsService);
     const cis = new OStorageCommandInterface(server, cfg, logger, events, redisClient);
     this.oss = oss;
 
