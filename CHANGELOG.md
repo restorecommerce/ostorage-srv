@@ -1,3 +1,9 @@
+### 0.1.17 (February 15th, 2021)
+
+- update put and get api for request and response streaming (to handle back pressure for `put` and pipe request stream for `get`)
+- updated chassis-srv and grpc-client (fix for request and response streaming)
+- updated tests
+
 ### 0.1.16 (January 28th, 2021)
 
 - fixed put api for error handling

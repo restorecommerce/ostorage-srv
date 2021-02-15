@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/ostorage-srv",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "Restorecommerce microservice for storing objects",
   "main": "lib/start.js",
   "author": "n-fuse GmbH",
