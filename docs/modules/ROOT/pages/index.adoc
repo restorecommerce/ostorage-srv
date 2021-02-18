@@ -86,6 +86,7 @@ Object Key Naming Guidelines] are allowed.
 | version | string | optional | x-amz-version-id header - Version ID of the newly created object, in case the bucket has versioning turned on
 | md5 | string | optional | ETag - Entity tag that identifies the newly created object's data
 | tags | [ ] https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.access_control.Attribute`] | optional | The tag-set for the object. The tag-set is used for filtering by tag
+| data | google.protobuf.Any | optional | additional data `data` provided as JSON object
 |==============================================================================================================================================
 
 `io.restorecommerce.ostorage.Response`
@@ -116,7 +117,7 @@ Requests are performed using `io.restorecommerce.ostorage.GetRequest` protobuf m
 | bucket | string | required | Bucket to which the object is mapped to
 | flag | boolean | optional | If flag is set to `true` only metadata of object is fetched
 | download | boolean | optional | If flag is set to `true` then Content-Disposition is set as `attachment` else is set as `inline`
-|subject |`io.restorecommerce.auth.Subject` |required |Subject details
+| subject | `io.restorecommerce.auth.Subject` | required | Subject details
 |==============================================================================================================================================
 
 [#api_ostorage_list]
@@ -224,6 +225,19 @@ is specified in the `io.restorecommerce.ostorage.CopyRequest` and if tagging is 
 | options | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.ostorage.Options`] | optional | object metadata attached to Object.
 |==============================================================================================================================================
 
+`io.restorecommerce.ostorage.OstorageMessage`
+
+`OstorageMessage` is used for firing events when objects are downloaded or
+uploaded:
+
+[width="100%",cols="20%,16%,20%,44%",options="header",]
+|===============================================================================
+| Field | Type | Label | Description
+| key | string | required | Object key
+| bucket | string | required | Bucket to which the object is mapped to
+| metadata | google.protobuf.Any | required | Object metadata
+|===============================================================================
+
 [#events]
 == Events
 
@@ -235,13 +249,18 @@ List of events emitted by this microservice for below topics:
 [width="100%",cols="31%,33%,36%",options="header",]
 |==========================================================================================================================================
 | Topic Name | Event Name | Description
-| `io.restorecommerce.command` | `restoreResponse` | system restore response
-|                              | `resetResponse` | system reset response
-|                              | `healthCheckResponse` | system health check response
-|                              | `versionResponse` | system version response
-|                              | `configUpdateResponse` | configuration update response
-|                              | `flushCacheResponse` | flush ACS Cache response
+| `io.restorecommerce.command`  | `restoreResponse` | system restore response
+|                               | `resetResponse` | system reset response
+|                               | `healthCheckResponse` | system health check response
+|                               | `versionResponse` | system version response
+|                               | `configUpdateResponse` | configuration update response
+|                               | `flushCacheResponse` | flush ACS Cache response
+| `io.restorecommerce.ostorage` | `objectUploaded` | fired after an object was uploaded
+|                               | `objectDownloaded` | fired after an object was downloaded
 |==========================================================================================================================================
+
+The `objectUploaded` and `objectDownloaded` events are using the message object
+`io.restorecommerce.ostorage.OstorageMessage`. Structure of message is defined above.
 
 [#consumed-events]
 === Consumed

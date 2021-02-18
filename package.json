@@ -65,7 +65,7 @@
     "test-debug": "cross-env NODE_ENV=test mocha -R spec test/test.js --inspect-brk",
     "lcov-report": "nyc report --reporter=lcov",
     "coveralls": "nyc report --reporter=text-lcov | coveralls",
-    "createtopics": "node setupTopics.js io.restorecommerce.command",
+    "createtopics": "node setupTopics.js io.restorecommerce.command io.restorecommerce.ostorage",
     "build:tsc": "tsc -d",
     "build:clean": "rimraf lib",
     "build": "npm-run-all lint build:clean build:tsc",

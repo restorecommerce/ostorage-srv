@@ -55,9 +55,7 @@ export class Worker {
     const idsClient = new Client(idsClientCfg, logger);
     const idsService = await idsClient.connect();
 
-    const oss = new Service(cfg, logger, this.authZ, idsService);
     const cis = new OStorageCommandInterface(server, cfg, logger, events, redisClient);
-    this.oss = oss;
 
     const eventListener = async (msg: any, context: any, config: any, eventName: string) => {
       // command events
@@ -78,6 +76,9 @@ export class Worker {
         }
       }
     }
+
+    const oss = new Service(cfg, logger, this.topics, this.authZ, idsService);
+    this.oss = oss;
 
     // list of service names
     const serviceNamesCfg = cfg.get('serviceNames');

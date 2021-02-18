@@ -3,7 +3,9 @@ import * as aws from 'aws-sdk';
 import { PassThrough, Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
-import { checkAccessRequest, AccessResponse } from './utils';
+import {
+  checkAccessRequest, AccessResponse, unmarshallProtobufAny, marshallProtobufAny
+} from './utils';
 import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Subject, updateConfig } from '@restorecommerce/acs-client';
 import {
   Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse, CopyResponse,
@@ -22,7 +24,7 @@ export class Service {
   authZCheck: boolean;
   idsService: any;
 
-  constructor(cfg: any, private logger: any, authZ: ACSAuthZ, idsService: any) {
+  constructor(cfg: any, private logger: any, private topics: any, authZ: ACSAuthZ, idsService: any) {
     this.ossClient = new aws.S3(cfg.get('s3:client'));
     this.buckets = cfg.get('s3:buckets') || [];
     this.bucketsLifecycleConfigs = cfg.get('s3.bucketsLifecycleConfigs');
@@ -314,7 +316,7 @@ export class Service {
     if (!subject) {
       subject = {};
     }
-    // GET meta from stored object and query for accessReq with this meta
+
     if (!_.includes(this.buckets, bucket)) {
       return await call.end(new errors.InvalidArgument(`Invalid bucket name ${bucket}`));
     }
@@ -477,6 +479,7 @@ export class Service {
         downloadable.resume();
       });
 
+      let fileDownloaded = false;
       await new Promise<any>((resolve, reject) => {
         downloadable
           .on('httpData', async (chunk) => {
@@ -497,6 +500,7 @@ export class Service {
           })
           .on('finish', async (chunk) => {
             await call.end();
+            fileDownloaded = true;
             resolve(undefined);
           })
           .on('httpError', async (err: any) => {
@@ -526,6 +530,26 @@ export class Service {
             return reject(err);
           });
       });
+
+      // When an object is downloaded emit objectDownloaded event.
+
+      // collect all metadata
+      let allMetadata = {
+        optionsObj,
+        metaObj,
+        data,
+        meta_subject
+      };
+
+      if (fileDownloaded) {
+        const objectDownloadedPayload = {
+          key,
+          bucket,
+          metadata: marshallProtobufAny(allMetadata)
+        };
+        this.topics['ostorage'].emit('objectDownloaded', objectDownloadedPayload);
+      }
+
       return;
     }
   }
@@ -563,16 +587,11 @@ export class Service {
     return resource;
   }
 
-  private unmarshallProtobufAny(msg: any): any {
-    if (msg && msg.value) {
-      return JSON.parse(msg.value.toString());
-    }
-  }
-
   async put(call: any, callback: any): Promise<PutResponse> {
     let key, bucket, meta, options, subject;
     let streamRequest = await call.getServerRequestStream();
     const readable = new Readable({ read() { } });
+
     streamRequest.on('data', (data) => {
       bucket = data.bucket;
       key = data.key;
@@ -589,10 +608,10 @@ export class Service {
       readable.push(null);
     });
 
-    let response;
     if (options && options.data) {
-      options.data = this.unmarshallProtobufAny(options.data);
+      options.data = unmarshallProtobufAny(options.data);
     }
+
     try {
       // pause till first chunk is received to make ACS request
       await new Promise((resolve: any, reject) => {
@@ -638,7 +657,7 @@ export class Service {
       if (subject && subject.id) {
         subjectID = subject.id;
       }
-      response = await this.storeObject(
+      const response = await this.storeObject(
         key,
         bucket,
         readable, // readable stream
@@ -665,13 +684,25 @@ export class Service {
       if (subjectID) {
         subject = { id: subjectID };
       }
-      // only string data type can be stored in object metadata
+
+      // Only Key Value pairs where the Values must be strings can be stored
+      // inside the object metadata in S3, reason why we stringify the value fields.
+      // When sending over Kafka we send metadata as google.protobuf.Any,
+      // so we create a copy of the metaData object in unstringified state
       let metaData = {
         meta: JSON.stringify(meta),
         data: JSON.stringify(data),
         subject: JSON.stringify(subject),
         key,
       };
+
+      let metaDataCopy = {
+        meta,
+        data,
+        subject,
+        key,
+      };
+
       // get object length
       let length: number;
       length = readable.readableLength;
@@ -721,7 +752,18 @@ export class Service {
         });
       });
 
+
+
       if (result) {
+
+        // emit objectUploaded event
+        const objectUploadedPayload = {
+          key,
+          bucket,
+          metadata: marshallProtobufAny(metaDataCopy)
+        };
+        this.topics['ostorage'].emit('objectUploaded', objectUploadedPayload);
+
         const url = `//${bucket}/${key}`;
         const tags = options && options.tags;
         return { key, bucket, url, meta, tags, length };
@@ -891,7 +933,7 @@ export class Service {
           // override data if it is provided
           if (options.data) {
             // params.Metadata.data = JSON.stringify(options.data);
-            params.Metadata.data = JSON.stringify(this.unmarshallProtobufAny(options.data));
+            params.Metadata.data = JSON.stringify(unmarshallProtobufAny(options.data));
           } else {
             params.Metadata.data = JSON.stringify(data);
           }

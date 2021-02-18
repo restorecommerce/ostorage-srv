@@ -136,7 +136,28 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.rendering.RenderResponse"
       },
+      "objectUploaded": {
+        "protos": [
+          "io/restorecommerce/ostorage.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.ostorage.OstorageMessage"
+      },
+      "objectDownloaded": {
+        "protos": [
+          "io/restorecommerce/ostorage.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.ostorage.OstorageMessage"
+      },
       "topics": {
+        "ostorage": {
+          "topic": "io.restorecommerce.ostorage",
+          "events": [
+            "objectUploaded",
+            "objectDownloaded"
+          ]
+        },
         "command": {
           "topic": "io.restorecommerce.command",
           "events": [

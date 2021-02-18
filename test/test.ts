@@ -1,21 +1,21 @@
 import * as should from 'should';
 import { Worker } from '../lib/worker';
 import * as grpcClient from '@restorecommerce/grpc-client';
-import * as kafkaClient from '@restorecommerce/kafka-client';
+import { Events, Topic } from '@restorecommerce/kafka-client';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import * as sleep from 'sleep';
 import * as fs from 'fs';
 import { startGrpcMockServer, bucketPolicySetRQ, stopGrpcMockServer, permitCreateObjRule, denyCreateObjRule } from './utils';
-
-const Events = kafkaClient.Events;
+import {unmarshallProtobufAny} from "../lib/utils";
 
 let cfg: any;
 let logger;
 let client;
 let worker: Worker;
-// For event listeners
-let events;
 let oStorage;
+// For event listeners
+let events: Events;
+let topic: Topic;
 
 const options = {
   encoding: 'gzip',
@@ -133,7 +133,7 @@ describe('testing ostorage-srv with ACS enabled', () => {
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
       const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
       const call = await put();
-      const readStream = fs.createReadStream('./test/cfg/config.json');
+      const readStream = fs.createReadStream('./test/cfg/testObject.json');
       readStream.on('data', async (chunk) => {
         const data = {
           bucket: 'test',
@@ -212,7 +212,7 @@ describe('testing ostorage-srv with ACS enabled', () => {
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
       const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
       const call = await put();
-      const readStream = fs.createReadStream('./test/cfg/config.json');
+      const readStream = fs.createReadStream('./test/cfg/testObject.json');
       readStream.on('data', async (chunk) => {
         const data = {
           bucket: 'test',
@@ -411,7 +411,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
       const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
       const call = await put();
-      const readStream = fs.createReadStream('./test/cfg/config.json');
+      const readStream = fs.createReadStream('./test/cfg/testObject.json');
       readStream.on('data', async (chunk) => {
         const data = {
           bucket: 'test',
@@ -444,14 +444,55 @@ describe('testing ostorage-srv with ACS disabled', () => {
       sleep.sleep(3);
     });
 
-    it('Should store the data to storage server using request streaming', async () => {
+    it('Should store the data to storage server using request streaming and' +
+      ' validate objectUploaded event once object is stored', async () => {
       let response;
       // create streaming client request
       const clientConfig = cfg.get('grpc-client:service-ostorage');
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
       const put = client.makeEndpoint('put', clientConfig.publisher.instances[0]);
       const call = await put();
-      const readStream = fs.createReadStream('./test/cfg/config.json');
+
+      // Create an event listener for the "objectUploaded" event and when an
+      // object is uploaded, consume the event and validate the fields being sent.
+      const listener = function (msg: any, context: any, config: any, eventName: string): void {
+        if (eventName == 'objectUploaded') {
+          const key = msg.key;
+          const bucket = msg.bucket;
+          const metadata = JSON.stringify(unmarshallProtobufAny(msg.metadata));
+
+          let responseMetadata = JSON.stringify(
+            {
+              "meta":{
+                "owner":[
+                  {
+                    "id":"urn:restorecommerce:acs:names:ownerIndicatoryEntity",
+                    "value":"urn:restorecommerce:acs:model:organization.Organization"
+                  },
+                  {
+                    "id":"urn:restorecommerce:acs:names:ownerInstance",
+                    "value":"orgC"
+                  }
+                ]
+              },
+              "data":{},
+              "subject":{},
+              "key":"config.json"
+            });
+
+          should.exist(key);
+          should.exist(bucket);
+          should.exist(metadata);
+
+          key.should.equal('config.json');
+          bucket.should.equal('test');
+          metadata.should.equal(responseMetadata);
+        }
+      };
+      topic = events.topic('io.restorecommerce.ostorage');
+      topic.on('objectUploaded', listener);
+
+      const readStream = fs.createReadStream('./test/cfg/testObject.json');
       readStream.on('data', async (chunk) => {
         const data = {
           bucket: 'test',
@@ -497,7 +538,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       response.tags[1].value.should.equal('value_2');
 
       // check length
-      response.length.should.equal(10023);
+      response.length.should.equal(29);
 
       sleep.sleep(3);
     });
@@ -510,6 +551,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
         key: 'config.json',
         bucket: 'test'
       });
+
       const grpcRespStream = await call.getResponseStream();
       grpcRespStream.on('data', (data) => {
         should.exist(data);
@@ -521,10 +563,64 @@ describe('testing ostorage-srv with ACS disabled', () => {
       sleep.sleep(3);
     });
 
-    it('should get the Object with response streaming', async () => {
+    it('should get the Object with response streaming  and validate' +
+      ' objectDownloaded event once object is downloaded', async () => {
       const clientConfig = cfg.get('grpc-client:service-ostorage');
       const client = new grpcClient.grpcClient(clientConfig.transports.grpc, logger);
       const get = client.makeEndpoint('get', clientConfig.publisher.instances[0]);
+
+      // Create an event listener for the "objectUploaded" event and when an
+      // object is uploaded, consume the event and validate the fields being sent.
+      const listener = function (msg: any, context: any, config: any, eventName: string): void {
+        if (eventName == 'objectDownloaded') {
+          // what we receive
+          const key = msg.key;
+          const bucket = msg.bucket;
+          const metadata = unmarshallProtobufAny(msg.metadata);
+
+          // what we expect
+          const responseMetadata = {
+            optionsObj:{
+              encoding:"gzip",
+              content_type:"application/pdf",
+              content_language:"en-UK",
+              content_disposition:"inline",
+              length:29
+            },
+            metaObj:{
+              owner:[
+                {
+                  id:"urn:restorecommerce:acs:names:ownerIndicatoryEntity",
+                  value:"urn:restorecommerce:acs:model:organization.Organization"
+                },
+                {
+                  id:"urn:restorecommerce:acs:names:ownerInstance",
+                  value:"orgC"
+                }
+              ]
+            },
+            data:{},
+            meta_subject:{}
+          }
+
+          should.exist(key);
+          should.exist(bucket);
+          should.exist(metadata);
+
+          key.should.equal('config.json');
+          bucket.should.equal('test');
+          metadata.optionsObj.encoding.should.equal(responseMetadata.optionsObj.encoding);
+          metadata.optionsObj.content_type.should.equal(responseMetadata.optionsObj.content_type);
+          metadata.optionsObj.content_language.should.equal(responseMetadata.optionsObj.content_language);
+          metadata.optionsObj.content_disposition.should.equal(responseMetadata.optionsObj.content_disposition);
+          metadata.optionsObj.length.should.equal(responseMetadata.optionsObj.length);
+          metadata.metaObj.should.deepEqual(responseMetadata.metaObj);
+        }
+      };
+
+      topic = events.topic('io.restorecommerce.ostorage');
+      topic.on('objectDownloaded', listener);
+
       const call = await get({
         key: 'config.json',
         bucket: 'test'

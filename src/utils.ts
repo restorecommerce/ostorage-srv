@@ -121,3 +121,14 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
     custom_query_args: { custom_queries, custom_arguments }
   };
 }
+
+export const marshallProtobufAny = (msg: any): any => {
+  return {
+    type_url: '',
+    value: Buffer.from(JSON.stringify(msg))
+  };
+};
+
+export const unmarshallProtobufAny = (msg: any): any => {
+  return JSON.parse(msg.value.toString());
+};
