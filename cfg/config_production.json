@@ -48,7 +48,7 @@
       "publisher": {
         "name": "static",
         "instances": [
-          "grpc://access-contorl-srv:50061"
+          "grpc://access-contorl-srv:50051"
         ]
       }
     },
