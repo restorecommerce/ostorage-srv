@@ -541,7 +541,7 @@ export class Service {
         meta_subject
       };
 
-      if (fileDownloaded) {
+      if (fileDownloaded && this.topics && this.topics['ostorage']) {
         const objectDownloadedPayload = {
           key,
           bucket,
@@ -608,9 +608,6 @@ export class Service {
       readable.push(null);
     });
 
-    if (options && options.data) {
-      options.data = unmarshallProtobufAny(options.data);
-    }
 
     try {
       // pause till first chunk is received to make ACS request
@@ -678,7 +675,7 @@ export class Service {
     try {
       let data = {};
       if (options && options.data) {
-        data = options.data;
+        data = unmarshallProtobufAny(options.data);
       }
       let subject = {};
       if (subjectID) {
@@ -754,7 +751,7 @@ export class Service {
 
 
 
-      if (result) {
+      if (result && this.topics && this.topics['ostorage']) {
 
         // emit objectUploaded event
         const objectUploadedPayload = {
