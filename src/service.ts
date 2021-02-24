@@ -751,16 +751,16 @@ export class Service {
 
 
 
-      if (result && this.topics && this.topics['ostorage']) {
-
-        // emit objectUploaded event
-        const objectUploadedPayload = {
-          key,
-          bucket,
-          metadata: marshallProtobufAny(metaDataCopy)
-        };
-        this.topics['ostorage'].emit('objectUploaded', objectUploadedPayload);
-
+      if (result) {
+        if (this.topics && this.topics['ostorage']) {
+          // emit objectUploaded event
+          const objectUploadedPayload = {
+            key,
+            bucket,
+            metadata: marshallProtobufAny(metaDataCopy)
+          };
+          this.topics['ostorage'].emit('objectUploaded', objectUploadedPayload);
+        }
         const url = `//${bucket}/${key}`;
         const tags = options && options.tags;
         return { key, bucket, url, meta, tags, length };
