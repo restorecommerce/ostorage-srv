@@ -1,3 +1,9 @@
+### 0.1.19 (February 24th, 2021)
+
+- fix unmarshalling options data for object upload
+- updated logger and protos
+- updated node to 14.5.5 and updated npm
+
 ### 0.1.18 (February 19th, 2021)
 
 - fix acs-srv production port
