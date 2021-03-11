@@ -1,3 +1,7 @@
+### 0.1.20 (March 11th, 2021)
+
+- updated dependencies.
+
 ### 0.1.19 (February 24th, 2021)
 
 - fix unmarshalling options data for object upload
