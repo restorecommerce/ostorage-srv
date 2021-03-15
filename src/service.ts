@@ -472,14 +472,7 @@ export class Service {
       // and create stream from it
       const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
 
-      // TODO: need to check for chaining streams then we do not need to wait for drain and write response
-      // back-pressure handle - wait for drain event before resuming read operation
-      call.request.on('drain', () => {
-        // thiz.logger.debug('Drain event received, resuming readable stream');
-        downloadable.resume();
-      });
-
-      const transformBufferToGrpcObj = () => {      
+      const transformBufferToGrpcObj = () => {
         return new Transform({
           objectMode: true,
           transform: (data, _, done) => {
@@ -489,7 +482,12 @@ export class Service {
       };
 
       // Pipe through passthrough transformation stream
-      downloadable.pipe(transformBufferToGrpcObj()).pipe(call.request);
+      try {
+        downloadable.pipe(transformBufferToGrpcObj()).pipe(call.request);
+      } catch (err) {
+        this.logger.error('Error piping streamable response', { err: err.messsage });
+        await call.end(err);
+      }
       // When an object is downloaded emit objectDownloaded event.
       // collect all metadata
       let allMetadata = {
