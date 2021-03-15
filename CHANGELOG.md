@@ -1,3 +1,7 @@
+### 0.1.21 (March 15th, 2021)
+
+- fixed get / download api for piping the AWS response stream directly to grpc response stream
+
 ### 0.1.20 (March 11th, 2021)
 
 - updated dependencies.
