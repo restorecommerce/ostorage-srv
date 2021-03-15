@@ -1,6 +1,6 @@
 import * as _ from 'lodash';
 import * as aws from 'aws-sdk';
-import { PassThrough, Readable } from 'stream';
+import { PassThrough, Readable, Transform } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
 import {
@@ -479,60 +479,18 @@ export class Service {
         downloadable.resume();
       });
 
-      let fileDownloaded = false;
-      await new Promise<any>((resolve, reject) => {
-        downloadable
-          .on('httpData', async (chunk) => {
-            await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
-          })
-          .on('data', async (chunk) => {
-            let writeResp = await call.write({ bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
-            if (!writeResp) {
-              // thiz.logger.debug('Write response is false, pausing readeable stream');
-              downloadable.pause();
-            }
-          }).on('httpDone', async () => {
-            resolve(undefined);
-          })
-          .on('end', async (chunk) => {
-            await call.end();
-            resolve(undefined);
-          })
-          .on('finish', async (chunk) => {
-            await call.end();
-            fileDownloaded = true;
-            resolve(undefined);
-          })
-          .on('httpError', async (err: any) => {
-            if (err.code === 'NotFound') {
-              err = new errors.NotFound('Specified key does not exist');
-              err.code = 404;
-            }
-            // map the s3 error codes to standard chassis-srv errors
-            this.logger.error('HTTP error occurred while getting object',
-              {
-                Key: key, error: err, errorStack: err.stack
-              });
-            await call.end(err);
-            return reject(err);
-          })
-          .on('error', async (err: any) => {
-            // map the s3 error codes to standard chassis-srv errors
-            if (err.code === 'NotFound') {
-              err = new errors.NotFound('Specified key does not exist');
-              err.code = 404;
-            }
-            this.logger.error('Error occurred while getting object',
-              {
-                Key: key, error: err, errorStack: err.stack
-              });
-            await call.end(err);
-            return reject(err);
-          });
-      });
+      const transformBufferToGrpcObj = () => {      
+        return new Transform({
+          objectMode: true,
+          transform: (data, _, done) => {
+            done(null, { bucket, key, object: data, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
+          }
+        });
+      };
 
+      // Pipe through passthrough transformation stream
+      downloadable.pipe(transformBufferToGrpcObj()).pipe(call.request);
       // When an object is downloaded emit objectDownloaded event.
-
       // collect all metadata
       let allMetadata = {
         optionsObj,
@@ -541,7 +499,7 @@ export class Service {
         meta_subject
       };
 
-      if (fileDownloaded && this.topics && this.topics['ostorage']) {
+      if (this.topics && this.topics['ostorage']) {
         const objectDownloadedPayload = {
           key,
           bucket,
