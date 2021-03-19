@@ -5,7 +5,7 @@ import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Service } from './service';
 import { OStorageCommandInterface } from './commandInterface';
-import { createClient } from 'redis';
+import Redis from 'ioredis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import { Logger } from 'winston';
 import { Client } from '@restorecommerce/grpc-client';
@@ -45,7 +45,7 @@ export class Worker {
     // init redisClient
     const redisConfig = cfg.get('redis');
     redisConfig.db = cfg.get('redis:db-indexes:db-subject');
-    const redisClient = new createClient(redisConfig);
+    const redisClient = new Redis(redisConfig);
 
     // init ACS cache
     initializeCache();

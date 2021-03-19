@@ -1,6 +1,6 @@
 import * as _ from 'lodash';
 import * as aws from 'aws-sdk';
-import { PassThrough, Readable, Transform } from 'stream';
+import { Readable, Transform } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
 import {

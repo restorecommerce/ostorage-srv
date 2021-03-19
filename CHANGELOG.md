@@ -1,3 +1,8 @@
+### 0.1.22 (March 19th, 2021)
+
+- migrate from redis to ioredis
+- updated dependencies
+
 ### 0.1.21 (March 15th, 2021)
 
 - fixed get / download api for piping the AWS response stream directly to grpc response stream

@@ -1,7 +1,6 @@
 import {
   AuthZAction, Decision, PolicySetRQ, accessRequest, Subject
 } from '@restorecommerce/acs-client';
-import { RedisClient } from 'redis';
 import * as _ from 'lodash';
 import { Service } from './service';
 import { createServiceConfig } from '@restorecommerce/service-config';
