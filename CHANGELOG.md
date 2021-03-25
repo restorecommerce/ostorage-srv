@@ -1,3 +1,7 @@
+### 0.1.23 (March 25th, 2021)
+
+- fix typo in production config
+
 ### 0.1.22 (March 19th, 2021)
 
 - migrate from redis to ioredis

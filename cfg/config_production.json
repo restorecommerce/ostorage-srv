@@ -49,7 +49,7 @@
       "publisher": {
         "name": "static",
         "instances": [
-          "grpc://access-contorl-srv:50051"
+          "grpc://access-control-srv:50051"
         ]
       }
     },
