@@ -353,7 +353,7 @@ export class Service {
               err = new errors.NotFound('Specified key does not exist');
               err.code = 404;
             }
-            this.logger.error('Error occurred while retrieving metadata for key:',
+            this.logger.error('Error occurred while retrieving object tag',
               {
                 Key: key, error: err, errorStack: err.stack
               });
@@ -446,10 +446,7 @@ export class Service {
       ) {
         subject.scope = metaObj.owner[1].value;
       } else {
-        let err = new errors.NotFound('404 not found');
-        this.logger.error('Error occurred while getting object', {
-          Key: key, error: err
-        });
+        this.logger.debug('Object metadata not found');
       }
       let resource = { key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: AccessResponse;

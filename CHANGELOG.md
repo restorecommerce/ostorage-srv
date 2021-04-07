@@ -1,3 +1,7 @@
+### 0.1.24 (April 7th, 2021)
+
+- fix log message
+
 ### 0.1.23 (March 25th, 2021)
 
 - fix typo in production config
