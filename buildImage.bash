@@ -1,1 +1,10 @@
-docker build -t restorecommerce/ostorage-srv .
+#!/bin/bash
+
+SERVICE_NAME="ostorage-srv"
+
+DOCKER_BUILDKIT=1 docker build \
+  --tag restorecommerce/$SERVICE_NAME \
+  -f ./Dockerfile \
+  --cache-from restorecommerce/$SERVICE_NAME \
+  --build-arg APP_HOME=/home/node/$SERVICE_NAME \
+  .
