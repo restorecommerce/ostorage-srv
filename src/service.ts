@@ -478,6 +478,14 @@ export class Service {
         });
       };
 
+      downloadable.on('end', () => {
+        this.logger.debug('S3 read stream ended');
+      });
+
+      downloadable.on('error', async (err) => {
+        this.logger.error('Error reading Object from Server', { error: err.message });
+        await call.end(err);
+      });
       // Pipe through passthrough transformation stream
       try {
         downloadable.pipe(transformBufferToGrpcObj()).pipe(call.request);
