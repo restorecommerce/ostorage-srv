@@ -1,3 +1,8 @@
+### 0.1.25 (April 26th, 2021)
+
+- improved error handling for `get` api for s3 stream errors
+- updated dependencies
+
 ### 0.1.24 (April 7th, 2021)
 
 - fix log message
