@@ -202,11 +202,7 @@
       },
       "topics": {
         "ostorage": {
-          "topic": "io.restorecommerce.ostorage",
-          "events": [
-            "objectUploaded",
-            "objectDownloaded"
-          ]
+          "topic": "io.restorecommerce.ostorage"
         },
         "command": {
           "topic": "io.restorecommerce.command",
