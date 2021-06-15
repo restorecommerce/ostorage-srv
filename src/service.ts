@@ -493,7 +493,7 @@ export class Service {
         this.logger.error('Error piping streamable response', { err: err.messsage });
         await call.end(err);
       }
-      // When an object is downloaded emit objectDownloaded event.
+      // emit objectDownloadRequested event
       // collect all metadata
       let allMetadata = {
         optionsObj,
@@ -503,12 +503,16 @@ export class Service {
       };
 
       if (this.topics && this.topics['ostorage']) {
-        const objectDownloadedPayload = {
+        // update downloader subject scope from findByToken with default_scope
+        const dbSubject = await this.idsService.findByToken({ token: subject.token });
+        subject.scope = dbSubject?.data?.default_scope;
+        const objectDownloadRequestPayload = {
           key,
           bucket,
-          metadata: marshallProtobufAny(allMetadata)
+          metadata: marshallProtobufAny(allMetadata),
+          subject
         };
-        this.topics['ostorage'].emit('objectDownloaded', objectDownloadedPayload);
+        this.topics['ostorage'].emit('objectDownloadRequested', objectDownloadRequestPayload);
       }
 
       return;
@@ -718,7 +722,8 @@ export class Service {
           const objectUploadedPayload = {
             key,
             bucket,
-            metadata: marshallProtobufAny(metaDataCopy)
+            metadata: marshallProtobufAny(metaDataCopy),
+            subject: { id: subjectID }
           };
           this.topics['ostorage'].emit('objectUploaded', objectUploadedPayload);
         }

@@ -1,3 +1,8 @@
+### 0.1.26 (June 15th, 2021)
+
+- updated protos for osotrage (to include subject for OstorageMessage - event emitted on upload / download)
+- added subject of requestor when emitting objectUploaded / objectDownloadRequested event
+
 ### 0.1.25 (April 26th, 2021)
 
 - improved error handling for `get` api for s3 stream errors

@@ -193,7 +193,7 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.ostorage.OstorageMessage"
       },
-      "objectDownloaded": {
+      "objectDownloadRequested": {
         "protos": [
           "io/restorecommerce/ostorage.proto"
         ],

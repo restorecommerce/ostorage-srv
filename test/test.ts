@@ -572,7 +572,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       // Create an event listener for the "objectUploaded" event and when an
       // object is uploaded, consume the event and validate the fields being sent.
       const listener = function (msg: any, context: any, config: any, eventName: string): void {
-        if (eventName == 'objectDownloaded') {
+        if (eventName == 'objectDownloadRequested') {
           // what we receive
           const key = msg.key;
           const bucket = msg.bucket;
@@ -619,7 +619,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       };
 
       topic = events.topic('io.restorecommerce.ostorage');
-      topic.on('objectDownloaded', listener);
+      topic.on('objectDownloadRequested', listener);
 
       const call = await get({
         key: 'config.json',
