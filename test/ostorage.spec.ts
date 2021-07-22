@@ -464,6 +464,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
           let responseMetadata = JSON.stringify(
             {
               "meta":{
+                "created": 0,
+                "modified": 0,
+                "modified_by": "SYSTEM",
                 "owner":[
                   {
                     "id":"urn:restorecommerce:acs:names:ownerIndicatoryEntity",
@@ -479,7 +482,6 @@ describe('testing ostorage-srv with ACS disabled', () => {
               "subject":{},
               "key":"config.json"
             });
-
           should.exist(key);
           should.exist(bucket);
           should.exist(metadata);
@@ -588,6 +590,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
               length:29
             },
             metaObj:{
+              created: 0,                                                                                                                                                                                                                                 
+              modified: 0,                                                                                                                                                                                                                                
+              modified_by: 'SYSTEM',
               owner:[
                 {
                   id:"urn:restorecommerce:acs:names:ownerIndicatoryEntity",

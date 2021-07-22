@@ -182,7 +182,7 @@ export class Service {
       // target entity for ACS is bucket name here
       Object.assign(resource, { subject });
       acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
-        bucket, this);
+        bucket, this, null, true);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -448,7 +448,8 @@ export class Service {
       } else {
         this.logger.debug('Object metadata not found');
       }
-      let resource = { key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
+      // resource identifier is key here
+      let resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: AccessResponse;
       try {
         // target entity for ACS is bucket name here
@@ -558,10 +559,6 @@ export class Service {
     const readable = new Readable({ read() { } });
 
     streamRequest.on('data', (data) => {
-      bucket = data.bucket;
-      key = data.key;
-      options = data.options;
-      subject = data.subject;
       // add stream of data into a readable stream
       if (data.object) {
         readable.push(data.object);
@@ -579,9 +576,11 @@ export class Service {
       await new Promise((resolve: any, reject) => {
         if (!bucket || !key) {
           streamRequest.on('data', (data) => {
+            bucket = data.bucket;
             key = data.key;
             options = data.options;
             subject = data.subject;
+            meta = data.meta;
             resolve();
           });
         }
@@ -598,7 +597,6 @@ export class Service {
       let resource = { key, bucket, meta, options };
       this.createMetadata(resource, subject);
       // created meta if it was not provided in request
-      meta = resource.meta;
       let acsResponse: AccessResponse;
       try {
         // target entity for ACS is bucket name here
@@ -608,6 +606,7 @@ export class Service {
         this.logger.error('Error occurred requesting access-control-srv:', err);
         throw err;
       }
+      meta = resource.meta;
       if (acsResponse.decision != Decision.PERMIT) {
         throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
       }

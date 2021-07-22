@@ -69,7 +69,7 @@ const getUserServiceClient = async () => {
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function checkAccessRequest(subject: Subject, resources: any, action: AuthZAction,
-  entity: string, service: Service, resourceNameSpace?: string): Promise<AccessResponse | ReadPolicyResponse> {
+  entity: string, service: Service, resourceNameSpace?: string, whatIsAllowedRequest?: boolean): Promise<AccessResponse | ReadPolicyResponse> {
   let authZ = service.authZ;
   let data = _.cloneDeep(resources);
   // resolve subject id using findByToken api and update subject with id
@@ -87,6 +87,11 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
     data = [resources];
   } else if (action === AuthZAction.READ) {
     data.args = resources;
+  }
+
+  // set entity on request to denote it as readRequest and whatIsAllowed check
+  // is made instead of isAllowed for this
+  if(whatIsAllowedRequest) {
     data.entity = entity;
   }
 
