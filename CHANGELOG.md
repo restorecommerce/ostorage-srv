@@ -1,3 +1,9 @@
+## 0.1.27 (July 22nd, 2021)
+
+- modified checkAcessRequest to not add entity (to make isAllowed req for `get` Read requests)
+- modified `put` api to read the bucket, key and meta information once
+- updated dependencies
+
 ### 0.1.26 (June 15th, 2021)
 
 - updated protos for osotrage (to include subject for OstorageMessage - event emitted on upload / download)

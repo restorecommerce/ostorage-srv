@@ -41,11 +41,13 @@ let meta = {
   modified_by: 'SYSTEM',
   owner: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
-    value: 'urn:restorecommerce:acs:model:organization.Organization'
+    value: 'urn:restorecommerce:acs:model:organization.Organization',
+    attribute: []
   },
   {
     id: 'urn:restorecommerce:acs:names:ownerInstance',
-    value: 'orgC'
+    value: 'orgC',
+    attribute: []
   }]
 };
 
@@ -470,13 +472,16 @@ describe('testing ostorage-srv with ACS disabled', () => {
                 "owner":[
                   {
                     "id":"urn:restorecommerce:acs:names:ownerIndicatoryEntity",
-                    "value":"urn:restorecommerce:acs:model:organization.Organization"
+                    "value":"urn:restorecommerce:acs:model:organization.Organization",
+                    "attribute": []
                   },
                   {
                     "id":"urn:restorecommerce:acs:names:ownerInstance",
-                    "value":"orgC"
+                    "value":"orgC",
+                    "attribute": []
                   }
-                ]
+                ],
+                "acl": []
               },
               "data":{},
               "subject":{},
@@ -596,13 +601,16 @@ describe('testing ostorage-srv with ACS disabled', () => {
               owner:[
                 {
                   id:"urn:restorecommerce:acs:names:ownerIndicatoryEntity",
-                  value:"urn:restorecommerce:acs:model:organization.Organization"
+                  value:"urn:restorecommerce:acs:model:organization.Organization",
+                  attribute: []
                 },
                 {
                   id:"urn:restorecommerce:acs:names:ownerInstance",
-                  value:"orgC"
+                  value:"orgC",
+                  attribute: []
                 }
-              ]
+              ],
+              acl: []
             },
             data:{},
             meta_subject:{}
