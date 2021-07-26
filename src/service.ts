@@ -847,6 +847,9 @@ export class Service {
         // check write access to destination bucket
         subject.scope = destinationSubjectScope;
         // target entity for ACS is destination bucket here
+        // For Create ACS check use the meta ACL as passed from the subject
+        metaObj.acl = meta.acl? meta.acl : [];
+        resource.meta = metaObj;
         let writeAccessResponse = await checkAccessRequest(subject, resource,
           AuthZAction.CREATE, bucket, this);
         if (writeAccessResponse.decision != Decision.PERMIT) {

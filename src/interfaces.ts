@@ -14,6 +14,7 @@ export enum Operation {
 export interface Attribute {
   id?: string;
   value?: string;
+  attribute?: Attribute[];
 }
 
 export interface Options {
@@ -125,11 +126,16 @@ export interface Owner {
   value: string;
 }
 
+export interface AttributeObj {
+  attribute: Attribute[];
+}
+
 export interface Meta {
   created: number; // timestamp
   modified: number; // timestamp
   modified_by: string; // ID from last User who modified it
   owner: Owner[];
+  acl?: AttributeObj[];
 }
 
 export interface Call<T = GetRequest | DeleteRequest | PutRequest> {
