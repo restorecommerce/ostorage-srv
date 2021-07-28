@@ -1,3 +1,7 @@
+## 0.1.29 (July 28th, 2021)
+
+- fix meta for copy operation (when null)
+
 ## 0.1.28 (July 28th, 2021)
 
 - modified `copy` operation to support `acl` access-control list
