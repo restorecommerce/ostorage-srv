@@ -762,6 +762,9 @@ export class Service {
         copySource = item.copySource;
         key = item.key;
         meta = item.meta;
+        if (!meta) {
+          (meta as any) = {};
+        }
         options = item.options;
 
         // Regex to extract bucket name and key from copySource
@@ -848,7 +851,7 @@ export class Service {
         subject.scope = destinationSubjectScope;
         // target entity for ACS is destination bucket here
         // For Create ACS check use the meta ACL as passed from the subject
-        metaObj.acl = meta.acl? meta.acl : [];
+        metaObj.acl = meta?.acl? meta.acl : [];
         resource.meta = metaObj;
         let writeAccessResponse = await checkAccessRequest(subject, resource,
           AuthZAction.CREATE, bucket, this);
