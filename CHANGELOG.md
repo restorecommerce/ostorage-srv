@@ -1,3 +1,8 @@
+## 0.1.28 (July 28th, 2021)
+
+- modified `copy` operation to support `acl` access-control list
+- updated logger
+
 ## 0.1.27 (July 22nd, 2021)
 
 - modified checkAcessRequest to not add entity (to make isAllowed req for `get` Read requests)
