@@ -8,7 +8,7 @@ import { OStorageCommandInterface } from './commandInterface';
 import Redis from 'ioredis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import { Logger } from 'winston';
-import { Client } from '@restorecommerce/grpc-client';
+import { GrpcClient } from '@restorecommerce/grpc-client';
 
 export class Worker {
   events: Events;
@@ -52,8 +52,8 @@ export class Worker {
 
     // init ids-client to lookup token in case subject does not contain id
     const idsClientCfg = cfg.get('client:user');
-    const idsClient = new Client(idsClientCfg, logger);
-    const idsService = await idsClient.connect();
+    const idsClient = new GrpcClient(idsClientCfg, logger);
+    const idsService = idsClient.user;
 
     const cis = new OStorageCommandInterface(server, cfg, logger, events, redisClient);
 
@@ -65,7 +65,7 @@ export class Worker {
     const topicTypes = _.keys(kafkaCfg.topics);
     for (let topicType of topicTypes) {
       const topicName = kafkaCfg.topics[topicType].topic;
-      this.topics[topicType] = events.topic(topicName);
+      this.topics[topicType] = await events.topic(topicName);
       const offSetValue = await this.offsetStore.getOffset(topicName);
       logger.info('subscribing to topic with offset value', topicName, offSetValue);
       if (kafkaCfg.topics[topicType].events) {

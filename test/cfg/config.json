@@ -11,7 +11,7 @@
     },
     "buckets": [
       "test"
-     ]
+    ]
   },
   "logger": {
     "console": {
@@ -29,41 +29,11 @@
       "db-offsetStore": 0
     }
   },
-  "grpc-client": {
-     "service-ostorage": {
-        "transports": {
-          "grpc": {
-          "service": "io.restorecommerce.ostorage.Service",
-          "protos": [
-            "io/restorecommerce/ostorage.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/",
-          "timeout": 3000
-        }
-        },
-        "loadbalancer": {
-          "name": "roundRobin"
-        },
-        "publisher": {
-          "name": "static",
-          "instances": [
-            "grpc://localhost:50066"
-          ]
-        },
-        "endpoints": {
-          "put": {},
-          "get": {},
-          "delete": {},
-          "list": {},
-          "copy": {}
-        }
-      }
-  },
   "events": {
     "kafka": {
       "provider": "kafka",
-      "groupId": "restore-ostorage-srv",
-      "clientId": "restore-ostorage-srv",
+      "groupId": "restore-ostorage-srv-test",
+      "clientId": "restore-ostorage-srv-test",
       "kafkaHost": "localhost:29092",
       "latestOffset": false,
       "restoreCommand": {
@@ -200,7 +170,7 @@
             "grpcOstorage"
           ]
         },
-        "copy":{
+        "copy": {
           "transport": [
             "grpcOstorage"
           ]
@@ -290,7 +260,7 @@
       "delete": "urn:restorecommerce:acs:names:action:delete",
       "organization": "urn:restorecommerce:acs:model:organization.Organization"
     },
-    "cache":  {
+    "cache": {
       "host": "localhost",
       "port": 6379,
       "db-index": 5,
@@ -300,53 +270,45 @@
   },
   "client": {
     "acs-srv": {
-      "transports": {
-        "grpc": {
-          "service": "io.restorecommerce.access_control.Service",
-          "protos": [
-            "io/restorecommerce/access_control.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/",
-          "timeout": 3000
+      "address": "localhost:50061",
+      "proto": {
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "protoPath": "io/restorecommerce/access_control.proto",
+        "services": {
+          "acs-srv": {
+            "packageName": "io.restorecommerce.access_control",
+            "serviceName": "Service"
+          }
         }
-      },
-      "loadbalancer": {
-        "name": "roundRobin"
-      },
-      "publisher": {
-        "name": "static",
-        "instances": [
-          "grpc://localhost:50061"
-        ]
-      },
-      "endpoints": {
-        "isAllowed": {},
-        "whatIsAllowed": {}
       }
     },
     "user": {
-      "transports": {
-        "grpc": {
-          "service": "io.restorecommerce.user.Service",
-          "protos": [
-            "io/restorecommerce/user.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/",
-          "timeout": 3000
+      "address": "localhost:50051",
+      "proto": {
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "protoPath": "io/restorecommerce/user.proto",
+        "services": {
+          "user": {
+            "packageName": "io.restorecommerce.user",
+            "serviceName": "Service"
+          }
         }
       },
-      "loadbalancer": {
-        "name": "roundRobin"
-      },
-      "publisher": {
-        "name": "static",
-        "instances": [
-          "grpc://localhost:50061"
-        ]
-      },
-      "endpoints": {
-        "find": {},
-        "findByToken": {}
+      "bufferFields": {
+        "ReadRequest": "custom_arguments"
+      }
+    },
+    "ostorage": {
+      "address": "localhost:50066",
+      "proto": {
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "protoPath": "io/restorecommerce/ostorage.proto",
+        "services": {
+          "ostorage": {
+            "packageName": "io.restorecommerce.ostorage",
+            "serviceName": "Service"
+          }
+        }
       },
       "bufferFields": {
         "ReadRequest": "custom_arguments"

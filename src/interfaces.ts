@@ -70,13 +70,39 @@ export interface PutRequest {
   object: Buffer;
 }
 
-export interface PutResponse {
+export interface Status {
+  id: string;
+  code: number;
+  message: string;
+}
+
+export interface OperationStatus {
+  code: number;
+  message: string;
+}
+
+export interface PutResponsePayload {
   key?: string;
   bucket?: string;
   url?: string;
   meta?: any;
   tags?: Attribute[];
   length?: number;
+}
+
+export interface PutResponseWithPayloadStatus {
+  payload: PutResponsePayload;
+  status: Status;
+}
+
+export interface PutResponse {
+  response: PutResponseWithPayloadStatus;
+  operation_status: OperationStatus;
+}
+
+export interface DeleteResponse {
+  status: Status;
+  operation_status: OperationStatus;
 }
 
 export interface CopyRequest {
@@ -99,8 +125,14 @@ export interface CopyRequestList {
   items: CopyRequest[];
 }
 
+export interface CopyResponseWithPayloadStatus {
+  payload?: CopyResponse;
+  status?: Status;
+}
+
 export interface CopyResponseList {
-  response: CopyResponse[];
+  response?: CopyResponseWithPayloadStatus[];
+  operation_status?: OperationStatus;
 }
 
 // Parameters passed to the S3 copyObject function

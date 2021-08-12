@@ -4,16 +4,21 @@ import { Readable, Transform } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import { toObject } from '@restorecommerce/resource-base-interface';
 import {
-  checkAccessRequest, AccessResponse, unmarshallProtobufAny, marshallProtobufAny
+  checkAccessRequest, unmarshallProtobufAny, marshallProtobufAny, ReadPolicyResponse
 } from './utils';
-import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Subject, updateConfig } from '@restorecommerce/acs-client';
+import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Subject, updateConfig, DecisionResponse } from '@restorecommerce/acs-client';
 import {
   Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse, CopyResponse,
-  CopyResponseList, CopyObjectParams, Meta
+  CopyResponseList, CopyObjectParams, Meta, DeleteResponse
 } from './interfaces';
 
 const META_OWNER = 'meta.owner';
 const EQ = 'eq';
+
+const OPERATION_STATUS_SUCCESS = {
+  code: 200,
+  message: 'success'
+};
 
 export class Service {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
@@ -177,7 +182,7 @@ export class Service {
 
     let subject = call.request.subject;
     let resource: any = { bucket, filter };
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       // target entity for ACS is bucket name here
       Object.assign(resource, { subject });
@@ -318,10 +323,32 @@ export class Service {
     }
 
     if (!_.includes(this.buckets, bucket)) {
-      return await call.end(new errors.InvalidArgument(`Invalid bucket name ${bucket}`));
+      await call.write({
+        response: {
+          payload: null,
+          status: {
+            id: key,
+            code: 400,
+            message: `Invalid bucket name ${bucket}`
+          }
+        },
+        operation_status: OPERATION_STATUS_SUCCESS
+      });
+      return await call.end();
     }
     if (!key) {
-      return await call.end(new errors.InvalidArgument(`Invalid key name ${key}`));
+      await call.write({
+        response: {
+          payload: null,
+          status: {
+            id: key,
+            code: 400,
+            message: `Invalid key name ${key}`
+          }
+        },
+        operation_status: OPERATION_STATUS_SUCCESS
+      });
+      return await call.end();
     }
 
     // get metadata of the object stored in the S3 object storage
@@ -336,7 +363,18 @@ export class Service {
             err.code = 404;
           }
           this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
-          return await call.end(err);
+          await call.write({
+            response: {
+              payload: null,
+              status: {
+                id: key,
+                code: err.code,
+                message: err.message
+              }
+            },
+            operation_status: OPERATION_STATUS_SUCCESS
+          });
+          return await call.end();
         }
         resolve(data);
       });
@@ -358,7 +396,6 @@ export class Service {
                 Key: key, error: err, errorStack: err.stack
               });
             reject(err);
-            return await call.end(err);
           } else {
             resolve(data);
           }
@@ -366,6 +403,18 @@ export class Service {
       });
     } catch (err) {
       this.logger.info('No object tagging found for key:', { Key: key });
+      await call.write({
+        response: {
+          payload: null,
+          status: {
+            id: key,
+            code: err.code,
+            message: err.message
+          }
+        },
+        operation_status: OPERATION_STATUS_SUCCESS
+      });
+      return await call.end();
     }
     // capture meta data from response message
     let metaObj;
@@ -450,18 +499,35 @@ export class Service {
       }
       // resource identifier is key here
       let resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
-      let acsResponse: AccessResponse;
+      let acsResponse: ReadPolicyResponse;
       try {
         // target entity for ACS is bucket name here
         acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
           bucket, this);
       } catch (err) {
         this.logger.error('Error occurred requesting access-control-srv:', err);
-        return await call.end(err);
+        await call.write({
+          response: {
+            payload: null,
+            status: {
+              id: key,
+              code: acsResponse.operation_status.code,
+              message: acsResponse.operation_status.message
+            }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        });
+        return await call.end();
       }
       if (acsResponse.decision != Decision.PERMIT) {
-        const err = new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
-        return await call.end(err);
+        await call.write({
+          response: {
+            payload: null,
+            status: {}
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        });
+        return await call.end();
       }
 
       this.logger.info(`Received a request to get object ${key} on bucket ${bucket}`);
@@ -485,14 +551,38 @@ export class Service {
 
       downloadable.on('error', async (err) => {
         this.logger.error('Error reading Object from Server', { error: err.message });
-        await call.end(err);
+        const code = (err as any).code | 500;
+        await call.write({
+          response: {
+            payload: null,
+            status: {
+              id: key,
+              code,
+              message: err.message
+            }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        });
+        return await call.end();
       });
       // Pipe through passthrough transformation stream
       try {
         downloadable.pipe(transformBufferToGrpcObj()).pipe(call.request);
       } catch (err) {
         this.logger.error('Error piping streamable response', { err: err.messsage });
-        await call.end(err);
+        const code = (err as any).code | 500;
+        await call.write({
+          response: {
+            payload: null,
+            status: {
+              id: key,
+              code,
+              message: err.message
+            }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        });
+        return await call.end();
       }
       // emit objectDownloadRequested event
       // collect all metadata
@@ -588,27 +678,67 @@ export class Service {
 
       // validate object name and bucket
       if (!this.IsValidObjectName(key)) {
-        throw new errors.InvalidArgument(`Invalid Object name ${key}`);
+        return {
+          response: {
+            payload: null,
+            status: {
+              id: key,
+              code: 400,
+              message: `Invalid Object name ${key}`
+            }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        };
       }
       if (!_.includes(this.buckets, bucket)) {
-        throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
+        return {
+          response: {
+            payload: null,
+            status: {
+              id: key,
+              code: 400,
+              message: `Invalid bucket name ${bucket}`
+            }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        };
       }
 
       let resource = { key, bucket, meta, options };
       this.createMetadata(resource, subject);
       // created meta if it was not provided in request
-      let acsResponse: AccessResponse;
+      let acsResponse: DecisionResponse;
       try {
         // target entity for ACS is bucket name here
         acsResponse = await checkAccessRequest(subject, resource, AuthZAction.CREATE,
-          bucket, this);
+          bucket, this) as DecisionResponse;
       } catch (err) {
         this.logger.error('Error occurred requesting access-control-srv:', err);
-        throw err;
+        return {
+          response: {
+            payload: null,
+            status: {
+              id: key,
+              code: err.code | 500,
+              message: err.message
+            }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        };
       }
       meta = resource.meta;
       if (acsResponse.decision != Decision.PERMIT) {
-        throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+        return {
+          response: {
+            payload: null,
+            status: {
+              id: key,
+              code: acsResponse.operation_status.code,
+              message: acsResponse.operation_status.message
+            }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        };
       }
       let subjectID = '';
       if (subject && subject.token && !subject.id) {
@@ -629,7 +759,17 @@ export class Service {
       return response;
     } catch (e) {
       this.logger.error('Error occurred while storing object.', e);
-      throw e; // if you throw without a catch block you get an error
+      return {
+        response: {
+          payload: null,
+          status: {
+            id: key,
+            code: e.code,
+            message: e.message
+          }
+        },
+        operation_status: OPERATION_STATUS_SUCCESS
+      };
     }
   }
 
@@ -706,7 +846,17 @@ export class Service {
               {
                 Key: key, Bucket: bucket, error: err, errStack: err.stack
               });
-            throw err;
+            return {
+              response: {
+                payload: null,
+                status: {
+                  id: key,
+                  code: (err as any).code | 500,
+                  message: err.message
+                }
+              },
+              operation_status: OPERATION_STATUS_SUCCESS
+            };
           } else {
             resolve(data);
           }
@@ -728,7 +878,13 @@ export class Service {
         }
         const url = `//${bucket}/${key}`;
         const tags = options && options.tags;
-        return { key, bucket, url, meta, tags, length };
+        return {
+          response: {
+            payload: { key, bucket, url, meta, tags, length },
+            status: { id: key, code: 200, message: 'success' }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        };
       } else {
         this.logger.error('No output returned when trying to store object',
           {
@@ -736,7 +892,14 @@ export class Service {
           });
       }
     } catch (err) {
-      throw err;
+      this.logger.error('Error storing object', err);
+      return {
+        response: {
+          payload: null,
+          status: { id: key, code: err.code, message: err.message }
+        },
+        operation_status: OPERATION_STATUS_SUCCESS
+      };
     }
   }
 
@@ -747,7 +910,7 @@ export class Service {
     let key: string;
     let meta: Meta;
     let options: Options;
-    let grpcResponse: CopyResponseList = { response: [] };
+    let grpcResponse: CopyResponseList = { response: [], operation_status: { code: 0, message: '' } };
     let copyObjectResult;
 
     let subject = call.request.subject;
@@ -808,7 +971,14 @@ export class Service {
             });
           });
         } catch (err) {
-          throw err;
+          grpcResponse.response.push({
+            status: {
+              id: sourceKeyName,
+              code: err.code | 500,
+              message: err.message
+            }
+          });
+          continue;
         }
         let metaObj;
         let data = {};
@@ -834,29 +1004,50 @@ export class Service {
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
         let resource = { key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
-        let acsResponse: AccessResponse;
+        let acsResponse: ReadPolicyResponse;
         try {
           // target entity for ACS is source bucket here
           acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
             sourceBucketName, this);
         } catch (err) {
           this.logger.error('Error occurred requesting access-control-srv:', err);
-          throw err;
+          grpcResponse.response.push({
+            status: {
+              id: sourceKeyName,
+              code: err.code | 500,
+              message: err.message
+            }
+          });
+          continue;
         }
         if (acsResponse.decision != Decision.PERMIT) {
-          throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+          grpcResponse.response.push({
+            status: {
+              id: sourceKeyName,
+              code: acsResponse.operation_status.code | 500,
+              message: acsResponse.operation_status.message
+            }
+          });
+          continue;
         }
 
         // check write access to destination bucket
         subject.scope = destinationSubjectScope;
         // target entity for ACS is destination bucket here
         // For Create ACS check use the meta ACL as passed from the subject
-        metaObj.acl = meta?.acl? meta.acl : [];
+        metaObj.acl = meta?.acl ? meta.acl : [];
         resource.meta = metaObj;
         let writeAccessResponse = await checkAccessRequest(subject, resource,
           AuthZAction.CREATE, bucket, this);
         if (writeAccessResponse.decision != Decision.PERMIT) {
-          throw new PermissionDenied(writeAccessResponse.response.status.message, writeAccessResponse.response.status.code);
+          grpcResponse.response.push({
+            status: {
+              id: key,
+              code: writeAccessResponse.operation_status.code | 500,
+              message: writeAccessResponse.operation_status.message
+            }
+          });
+          continue;
         }
         // need to iterate and check if there is at least one key set
         // since the gRPC adds default values for missing fields
@@ -966,7 +1157,13 @@ export class Service {
               });
             });
           } catch (err) {
-            throw err;
+            grpcResponse.response.push({
+              status: {
+                id: key,
+                code: err.code | 500,
+                message: err.message
+              }
+            });
           }
         } else {
 
@@ -1073,7 +1270,13 @@ export class Service {
               });
             });
           } catch (err) {
-            throw err;
+            grpcResponse.response.push({
+              status: {
+                id: key,
+                code: err.code | 500,
+                message: err.message
+              }
+            });
           }
         }
 
@@ -1085,12 +1288,13 @@ export class Service {
             meta,
             options
           };
-          grpcResponse.response.push(copiedObject);
+          grpcResponse.response.push({ payload: copiedObject, status: { id: key, code: 200, message: 'success' } });
         } else {
           this.logger.error('Copy object failed for:', { DestinationBucket: bucket, CopySource: copySource, Key: key, Meta: meta, Options: options });
         }
       }
     }
+    grpcResponse.operation_status = { code: 200, message: 'success' };
     return grpcResponse;
   }
 
@@ -1102,11 +1306,14 @@ export class Service {
     return (allowedCharacters.test(key));
   }
 
-  async delete(call: Call<DeleteRequest>, context?: any): Promise<void> {
+  async delete(call: Call<DeleteRequest>, context?: any): Promise<DeleteResponse> {
     const { bucket, key } = call.request;
     let subject = call.request.subject;
     if (!_.includes(this.buckets, bucket)) {
-      throw new errors.InvalidArgument(`Invalid bucket name ${bucket}`);
+      return {
+        status: { id: key, code: 400, message: `Invalid bucket name ${bucket}` },
+        operation_status: OPERATION_STATUS_SUCCESS
+      };
     }
 
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
@@ -1132,7 +1339,10 @@ export class Service {
         });
       });
     } catch (err) {
-      throw err;
+      return {
+        status: { id: key, code: err.code, message: err.message },
+        operation_status: OPERATION_STATUS_SUCCESS
+      };
     }
     // capture meta data from response message
     let metaObj;
@@ -1150,16 +1360,22 @@ export class Service {
       }
     }
     Object.assign(resources, { meta: metaObj, data, subject: { id: meta_subject.id } });
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
         bucket, this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return {
+        status: { id: key, code: err.code, message: err.message },
+        operation_status: OPERATION_STATUS_SUCCESS
+      };
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return {
+        status: { id: key, code: acsResponse.operation_status.code, message: acsResponse.operation_status.message },
+        operation_status: OPERATION_STATUS_SUCCESS
+      };
     }
 
     const result = await this.ossClient.deleteObject({
@@ -1171,9 +1387,16 @@ export class Service {
       this.logger.error(`Error while deleting object ${key} from bucket ${bucket}`, {
         error: result.$response.error
       });
-      throw result.$response.error;
+      return {
+        status: { id: key, code: 500, message: result.$response.error.message },
+        operation_status: OPERATION_STATUS_SUCCESS
+      };
     }
     this.logger.info(`Successfully deleted object ${key} from bucket ${bucket}`);
+    return {
+      status: { id: key, code: 200, message: 'success' },
+      operation_status: OPERATION_STATUS_SUCCESS
+    };
   }
 
   /**
