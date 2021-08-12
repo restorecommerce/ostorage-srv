@@ -9,7 +9,7 @@ import {
 import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Subject, updateConfig, DecisionResponse } from '@restorecommerce/acs-client';
 import {
   Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse, CopyResponse,
-  CopyResponseList, CopyObjectParams, Meta, DeleteResponse
+  CopyResponseList, CopyObjectParams, Meta, DeleteResponse, ListResponse
 } from './interfaces';
 
 const META_OWNER = 'meta.owner';
@@ -164,25 +164,31 @@ export class Service {
     }
   }
 
-  private filterObjects(hasFilter, requestFilter, object, objectToReturn) {
+  private filterObjects(requestFilter, object, listResponse) {
     // if filter is provided return data based on filter
-    if (hasFilter && requestFilter.field == META_OWNER && requestFilter.operation == EQ && requestFilter.value) {
+    if (requestFilter && requestFilter.field == META_OWNER && requestFilter.operation == EQ && requestFilter.value) {
       const MetaOwnerVal = object.meta.owner[1].value;
       // check only for the files matching the requested Owner Organizations
       if (requestFilter.value == MetaOwnerVal) {
-        objectToReturn.push(object);
+        listResponse.response.push({
+          payload: object,
+          status: { id: object.object_name, code: 200, message: 'success' }
+        });
       }
     } else { // else return all data
-      objectToReturn.push(object);
+      listResponse.response.push({
+        payload: object,
+        status: { id: object.object_name, code: 200, message: 'success' }
+      });
     }
   }
 
-  async list(call: Call<ListRequest>, context?: any): Promise<any> {
-    let { bucket, filter } = call.request;
+  async list(call: Call<ListRequest>, context?: any): Promise<ListResponse> {
+    let { bucket, filters } = call.request;
 
     let subject = call.request.subject;
-    let resource: any = { bucket, filter };
-    let acsResponse: DecisionResponse;
+    let resource: any = { bucket, filters };
+    let acsResponse: ReadPolicyResponse; // WhatisAllowed check for Read operation
     try {
       // target entity for ACS is bucket name here
       Object.assign(resource, { subject });
@@ -190,10 +196,15 @@ export class Service {
         bucket, this, null, true);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return {
+        operation_status: {
+          code: err.code,
+          message: err.message
+        }
+      };
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return { operation_status: acsResponse.operation_status };
     }
     const customArgs = resource.custom_arguments;
     const ownerIndictaorEntURN = this.cfg.get('authorization:urns:ownerIndicatoryEntity');
@@ -205,21 +216,17 @@ export class Service {
       ownerValues = customArgsFilter.instance;
       ownerIndicatorEntity = customArgsFilter.entity;
     }
-    // if request contains a filter return data based on it
-    let hasFilter = false;
-    let requestFilter;
-    if (filter) {
-      hasFilter = true;
-      // convert filter from struct back to object
-      requestFilter = toObject(filter);
-    }
+
     let buckets = [];
     if (bucket) {
       buckets.push(bucket);
     } else {
       buckets = this.buckets;
     }
-    let objectToReturn = [];
+    let listResponse: ListResponse = {
+      response: [],
+      operation_status: { code: 0, message: '' }
+    };
 
     for (const value of buckets) {
       if (value != null) {
@@ -240,7 +247,9 @@ export class Service {
             });
           });
         } catch (err) {
-          throw err;
+          return {
+            operation_status: { code: err.code, message: err.message }
+          };
         }
 
         if (objList != null) {
@@ -270,7 +279,9 @@ export class Service {
                 });
               });
             } catch (err) {
-              throw err;
+              return {
+                operation_status: { code: err.code, message: err.message }
+              };
             }
             const url = `//${value}/${meta.key}`;
             const objectName = meta.key;
@@ -296,21 +307,29 @@ export class Service {
                   }
                 }
                 if (match && ownerInst && ownerValues.includes(ownerInst)) {
-                  this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
+                  if (filters && filters.filter) {
+                    this.filterObjects(filters.filter[0], object, listResponse);
+                  }
                 }
                 // no scoping defined in the Rule
                 if (!ownerValues) {
-                  objectToReturn.push(object);
+                  listResponse.response.push({
+                    payload: object,
+                    status: { id: objectName, code: 200, message: 'success' }
+                  });
                 }
               }
             } else {
-              this.filterObjects(hasFilter, requestFilter, object, objectToReturn);
+              if (filters && filters.filter) {
+                this.filterObjects(filters.filter[0], object, listResponse);
+              }
             }
           }
         }
       }
     }
-    return objectToReturn;
+    listResponse.operation_status = OPERATION_STATUS_SUCCESS;
+    return listResponse;
   }
 
   async get(call: any, context?: any): Promise<any> {
@@ -499,7 +518,7 @@ export class Service {
       }
       // resource identifier is key here
       let resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
-      let acsResponse: ReadPolicyResponse;
+      let acsResponse: DecisionResponse; // isAllowed check for Read operation
       try {
         // target entity for ACS is bucket name here
         acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
@@ -1004,7 +1023,7 @@ export class Service {
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
         let resource = { key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
-        let acsResponse: ReadPolicyResponse;
+        let acsResponse: DecisionResponse; // isAllowed check for Read operation
         try {
           // target entity for ACS is source bucket here
           acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,

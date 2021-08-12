@@ -1,4 +1,5 @@
 import { Subject } from '@restorecommerce/acs-client';
+import { FilterOp } from '@restorecommerce/resource-base-interface';
 
 export enum Operation {
   GT = 'gt',
@@ -52,8 +53,24 @@ export interface GRequest {
 
 export interface ListRequest {
   bucket: string;
-  filter: FilterType;
+  filters: FilterOp;
   subject?: Subject;
+}
+
+export interface ObjectData {
+  object_name?: string;
+  url?: string;
+  meta?: Meta;
+}
+
+export interface ObjectsDataWithPayloadStatus {
+  payload?: ObjectData;
+  status?: Status;
+}
+
+export interface ListResponse {
+  response?: ObjectsDataWithPayloadStatus[];
+  operation_status?: OperationStatus;
 }
 
 export interface DeleteRequest {
