@@ -16,7 +16,7 @@
   "logger": {
     "console": {
       "handleExceptions": false,
-      "level": "crit",
+      "level": "silly",
       "colorize": true,
       "prettyPrint": true
     }
@@ -33,8 +33,12 @@
     "kafka": {
       "provider": "kafka",
       "groupId": "restore-ostorage-srv-test",
-      "clientId": "restore-ostorage-srv-test",
-      "kafkaHost": "localhost:29092",
+      "kafka": {
+        "clientId": "restore-ostorage-srv-test",
+        "brokers": [
+          "localhost:29092"
+        ]
+      },
       "latestOffset": false,
       "restoreCommand": {
         "protos": [

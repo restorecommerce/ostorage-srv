@@ -56,7 +56,7 @@
   "scripts": {
     "start": "npm run createtopics && node lib/start.js",
     "dev": "cross-env NODE_ENV=development npm run createtopics && nodemon -e ts --trace-warnings lib/start.js",
-    "test": "npm run createtopics && npm run build && npm run lint && nyc npm run mocha",
+    "test": "npm run lint && nyc npm run mocha",
     "lint": "eslint src --ext .ts",
     "mocha": "cross-env NODE_ENV=test mocha --full-trace --exit --timeout 15000",
     "tsctests": "tsc -d -p tsconfig.test.json",

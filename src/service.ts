@@ -166,14 +166,17 @@ export class Service {
 
   private filterObjects(requestFilter, object, listResponse) {
     // if filter is provided return data based on filter
-    if (requestFilter && requestFilter.field == META_OWNER && requestFilter.operation == EQ && requestFilter.value) {
-      const MetaOwnerVal = object.meta.owner[1].value;
-      // check only for the files matching the requested Owner Organizations
-      if (requestFilter.value == MetaOwnerVal) {
-        listResponse.response.push({
-          payload: object,
-          status: { id: object.object_name, code: 200, message: 'success' }
-        });
+    if (requestFilter && requestFilter.filters?.filter) {
+      const filter = requestFilter.filters.filter[0];
+      if (filter && filter.field == META_OWNER && filter.operation == EQ && filter.value) {
+        const MetaOwnerVal = object.meta.owner[1].value;
+        // check only for the files matching the requested Owner Organizations
+        if (filter.value == MetaOwnerVal) {
+          listResponse.response.push({
+            payload: object,
+            status: { id: object.object_name, code: 200, message: 'success' }
+          });
+        }
       }
     } else { // else return all data
       listResponse.response.push({
@@ -307,9 +310,7 @@ export class Service {
                   }
                 }
                 if (match && ownerInst && ownerValues.includes(ownerInst)) {
-                  if (filters && filters.filter) {
-                    this.filterObjects(filters.filter[0], object, listResponse);
-                  }
+                  this.filterObjects(filters, object, listResponse);
                 }
                 // no scoping defined in the Rule
                 if (!ownerValues) {
@@ -320,9 +321,7 @@ export class Service {
                 }
               }
             } else {
-              if (filters && filters.filter) {
-                this.filterObjects(filters.filter[0], object, listResponse);
-              }
+              this.filterObjects(filters, object, listResponse);
             }
           }
         }
@@ -333,7 +332,6 @@ export class Service {
   }
 
   async get(call: any, context?: any): Promise<any> {
-
     // get gRPC call request
     const { bucket, key, download } = call.request.request;
     let subject = call.request.request.subject;
@@ -542,7 +540,11 @@ export class Service {
         await call.write({
           response: {
             payload: null,
-            status: {}
+            status: {
+              id: key,
+              code: acsResponse.operation_status.code,
+              message: acsResponse.operation_status.message
+            }
           },
           operation_status: OPERATION_STATUS_SUCCESS
         });
@@ -559,18 +561,33 @@ export class Service {
         return new Transform({
           objectMode: true,
           transform: (data, _, done) => {
-            done(null, { bucket, key, object: data, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj });
+            done(null, {
+              response: {
+                payload: { bucket, key, object: data, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj }
+              },
+            });
           }
         });
       };
 
-      downloadable.on('end', () => {
+      downloadable.on('end', async () => {
+        await call.write({
+          response: {
+            payload: null,
+            status: {
+              id: key,
+              code: 200,
+              message: 'success'
+            }
+          },
+          operation_status: OPERATION_STATUS_SUCCESS
+        });
         this.logger.debug('S3 read stream ended');
       });
 
       downloadable.on('error', async (err) => {
         this.logger.error('Error reading Object from Server', { error: err.message });
-        const code = (err as any).code | 500;
+        const code = (err as any).code || 500;
         await call.write({
           response: {
             payload: null,
@@ -589,7 +606,7 @@ export class Service {
         downloadable.pipe(transformBufferToGrpcObj()).pipe(call.request);
       } catch (err) {
         this.logger.error('Error piping streamable response', { err: err.messsage });
-        const code = (err as any).code | 500;
+        const code = (err as any).code || 500;
         await call.write({
           response: {
             payload: null,
@@ -615,7 +632,7 @@ export class Service {
       if (this.topics && this.topics['ostorage']) {
         // update downloader subject scope from findByToken with default_scope
         const dbSubject = await this.idsService.findByToken({ token: subject.token });
-        subject.scope = dbSubject?.data?.default_scope;
+        subject.scope = dbSubject?.payload?.default_scope;
         const objectDownloadRequestPayload = {
           key,
           bucket,
@@ -694,7 +711,6 @@ export class Service {
           });
         }
       });
-
       // validate object name and bucket
       if (!this.IsValidObjectName(key)) {
         return {
@@ -738,7 +754,7 @@ export class Service {
             payload: null,
             status: {
               id: key,
-              code: err.code | 500,
+              code: err.code || 500,
               message: err.message
             }
           },
@@ -760,9 +776,9 @@ export class Service {
         };
       }
       let subjectID = '';
-      if (subject && subject.token && !subject.id) {
+      if (subject && subject.token) {
         const dbSubject = await this.idsService.findByToken({ token: subject.token });
-        subjectID = dbSubject?.data?.id;
+        subjectID = dbSubject?.payload?.id;
       }
       if (subject && subject.id) {
         subjectID = subject.id;
@@ -870,7 +886,7 @@ export class Service {
                 payload: null,
                 status: {
                   id: key,
-                  code: (err as any).code | 500,
+                  code: (err as any).code || 500,
                   message: err.message
                 }
               },
@@ -993,7 +1009,7 @@ export class Service {
           grpcResponse.response.push({
             status: {
               id: sourceKeyName,
-              code: err.code | 500,
+              code: err.code || 500,
               message: err.message
             }
           });
@@ -1033,7 +1049,7 @@ export class Service {
           grpcResponse.response.push({
             status: {
               id: sourceKeyName,
-              code: err.code | 500,
+              code: err.code || 500,
               message: err.message
             }
           });
@@ -1043,7 +1059,7 @@ export class Service {
           grpcResponse.response.push({
             status: {
               id: sourceKeyName,
-              code: acsResponse.operation_status.code | 500,
+              code: acsResponse.operation_status.code || 500,
               message: acsResponse.operation_status.message
             }
           });
@@ -1062,7 +1078,7 @@ export class Service {
           grpcResponse.response.push({
             status: {
               id: key,
-              code: writeAccessResponse.operation_status.code | 500,
+              code: writeAccessResponse.operation_status.code || 500,
               message: writeAccessResponse.operation_status.message
             }
           });
@@ -1179,7 +1195,7 @@ export class Service {
             grpcResponse.response.push({
               status: {
                 id: key,
-                code: err.code | 500,
+                code: err.code || 500,
                 message: err.message
               }
             });
@@ -1292,7 +1308,7 @@ export class Service {
             grpcResponse.response.push({
               status: {
                 id: key,
-                code: err.code | 500,
+                code: err.code || 500,
                 message: err.message
               }
             });
@@ -1330,7 +1346,7 @@ export class Service {
     let subject = call.request.subject;
     if (!_.includes(this.buckets, bucket)) {
       return {
-        status: { id: key, code: 400, message: `Invalid bucket name ${bucket}` },
+        status: [{ id: key, code: 400, message: `Invalid bucket name ${bucket}` }],
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }
@@ -1359,7 +1375,7 @@ export class Service {
       });
     } catch (err) {
       return {
-        status: { id: key, code: err.code, message: err.message },
+        status: [{ id: key, code: err.code, message: err.message }],
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }
@@ -1386,13 +1402,13 @@ export class Service {
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return {
-        status: { id: key, code: err.code, message: err.message },
+        status: [{ id: key, code: err.code, message: err.message }],
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }
     if (acsResponse.decision != Decision.PERMIT) {
       return {
-        status: { id: key, code: acsResponse.operation_status.code, message: acsResponse.operation_status.message },
+        status: [{ id: key, code: acsResponse.operation_status.code, message: acsResponse.operation_status.message }],
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }
@@ -1407,13 +1423,13 @@ export class Service {
         error: result.$response.error
       });
       return {
-        status: { id: key, code: 500, message: result.$response.error.message },
+        status: [{ id: key, code: 500, message: result.$response.error.message }],
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }
     this.logger.info(`Successfully deleted object ${key} from bucket ${bucket}`);
     return {
-      status: { id: key, code: 200, message: 'success' },
+      status: [{ id: key, code: 200, message: 'success' }],
       operation_status: OPERATION_STATUS_SUCCESS
     };
   }

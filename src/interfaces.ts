@@ -118,7 +118,7 @@ export interface PutResponse {
 }
 
 export interface DeleteResponse {
-  status: Status;
+  status: Status[];
   operation_status: OperationStatus;
 }
 
