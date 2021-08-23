@@ -1,3 +1,11 @@
+## 0.2.0 (August 23rd, 2021)
+
+- migrated to latest grpc-client
+- migraged kafka-client to kafkajs
+- chassis-srv using the latest grpc-js and protobufdef loader
+- filter changes (removed google.protobuf.struct completely and defined nested proto structure)
+- added status object to each item and also overall operation_status
+
 ## 0.1.29 (July 28th, 2021)
 
 - fix meta for copy operation (when null)
