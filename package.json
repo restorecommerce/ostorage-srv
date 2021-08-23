@@ -54,16 +54,15 @@
     "typescript": "^4.3.5"
   },
   "scripts": {
-    "start": "npm run createtopics && node lib/start.js",
-    "dev": "cross-env NODE_ENV=development npm run createtopics && nodemon -e ts --trace-warnings lib/start.js",
-    "test": "npm run lint && nyc npm run mocha",
+    "start": "node lib/start.js",
+    "dev": "cross-env NODE_ENV=development && nodemon -e ts --trace-warnings lib/start.js",
+    "test": "npm run build && npm run lint && nyc npm run mocha",
     "lint": "eslint src --ext .ts",
     "mocha": "cross-env NODE_ENV=test mocha --full-trace --exit --timeout 15000",
     "tsctests": "tsc -d -p tsconfig.test.json",
     "test-debug": "cross-env NODE_ENV=test mocha -R spec test/test.js --inspect-brk",
     "lcov-report": "nyc report --reporter=lcov",
     "coveralls": "nyc report --reporter=text-lcov | coveralls",
-    "createtopics": "node setupTopics.js io.restorecommerce.command io.restorecommerce.ostorage",
     "build:tsc": "tsc -d",
     "build:clean": "rimraf lib",
     "build": "npm-run-all lint build:clean build:tsc"
