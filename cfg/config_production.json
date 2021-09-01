@@ -21,7 +21,7 @@
     "kafka": {
       "kafka": {
         "brokers": [
-          "localhost:29092"
+          "kafka:9092"
         ]
       }
     }

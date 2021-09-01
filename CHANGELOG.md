@@ -1,3 +1,7 @@
+## 0.2.1 (September 2nd, 2021)
+
+- fix kafka production port
+
 ## 0.2.0 (August 23rd, 2021)
 
 - migrated to latest grpc-client
