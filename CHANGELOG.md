@@ -1,6 +1,7 @@
-## 0.2.1 (September 2nd, 2021)
+## 0.2.1 (September 13th, 2021)
 
 - fix kafka production port
+- up dependencies
 
 ## 0.2.0 (August 23rd, 2021)
 
