@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/ostorage-srv",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Restorecommerce microservice for storing objects",
   "main": "lib/start.js",
   "author": "n-fuse GmbH",
@@ -17,15 +17,15 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/acs-client": "^0.4.8",
+    "@restorecommerce/acs-client": "^0.4.11",
     "@restorecommerce/chassis-srv": "^0.3.2",
     "@restorecommerce/cluster-service": "^0.1.10",
-    "@restorecommerce/grpc-client": "^0.2.8",
-    "@restorecommerce/kafka-client": "^0.2.22",
-    "@restorecommerce/logger": "^0.10.7",
+    "@restorecommerce/grpc-client": "^0.2.10",
+    "@restorecommerce/kafka-client": "^0.2.23",
+    "@restorecommerce/logger": "^0.10.8",
     "@restorecommerce/protos": "^0.4.4",
     "@restorecommerce/resource-base-interface": "^0.2.0",
-    "@restorecommerce/service-config": "^0.4.17",
+    "@restorecommerce/service-config": "^0.4.18",
     "aws-sdk": "^2.988.0",
     "koa-multer": "^1.0.2",
     "multer-s3": "^2.9.0",
