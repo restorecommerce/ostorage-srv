@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/ostorage-srv",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Restorecommerce microservice for storing objects",
   "main": "lib/start.js",
   "author": "n-fuse GmbH",
@@ -17,7 +17,7 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/acs-client": "^0.4.13",
+    "@restorecommerce/acs-client": "^0.4.14",
     "@restorecommerce/chassis-srv": "^0.3.2",
     "@restorecommerce/cluster-service": "^0.1.10",
     "@restorecommerce/grpc-client": "^0.2.10",
