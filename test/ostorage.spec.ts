@@ -43,11 +43,13 @@ let meta = {
   modified_by: 'SYSTEM',
   owner: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
-    value: 'urn:restorecommerce:acs:model:organization.Organization'
+    value: 'urn:restorecommerce:acs:model:organization.Organization',
+    attribute: []
   },
   {
     id: 'urn:restorecommerce:acs:names:ownerInstance',
-    value: 'orgC'
+    value: 'orgC',
+    attribute: []
   }]
 };
 
@@ -558,19 +560,22 @@ describe('testing ostorage-srv with ACS disabled', () => {
                   {
                     id: "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
                     value: "urn:restorecommerce:acs:model:organization.Organization",
+                    attribute: []
                   },
                   {
                     id: "urn:restorecommerce:acs:names:ownerInstance",
-                    value: "orgC"
+                    value: "orgC",
+                    attribute: []
                   }
                 ],
+                acl: [],
                 created: 0,
                 modified: 0,
                 modified_by: 'SYSTEM'
               },
               data: {},
               meta_subject: {}
-            }
+            };
 
             should.exist(key);
             should.exist(bucket);
