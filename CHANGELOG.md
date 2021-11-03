@@ -1,3 +1,7 @@
+## 0.2.5 (November 3rd, 2021)
+
+- store ACL data into redis instead of object metadata in S3 (due to header size limitation)
+
 ## 0.2.4 (October 7th, 2021)
 
 - up acs-client
