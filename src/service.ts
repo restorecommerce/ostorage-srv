@@ -844,7 +844,7 @@ export class Service {
       // inside the object metadata in S3, reason why we stringify the value fields.
       // When sending over Kafka we send metadata as google.protobuf.Any,
       // so we create a copy of the metaData object in unstringified state
-      if (meta && meta.acl) {
+      if (meta && meta.acl && !_.isEmpty(meta.acl)) {
         // store meta acl to redis
         await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
         delete meta.acl;
@@ -1149,7 +1149,7 @@ export class Service {
               value: destinationSubjectScope
             }];
           }
-          if (meta.acl) {
+          if (meta && meta.acl && !_.isEmpty(meta.acl)) {
             // store meta acl to redis
             await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
             delete meta.acl;
@@ -1255,7 +1255,7 @@ export class Service {
               value: destinationSubjectScope
             }];
           }
-          if (meta.acl) {
+          if (meta && meta.acl&& !_.isEmpty(meta.acl)) {
             // store meta acl to redis
             await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
             delete meta.acl;
