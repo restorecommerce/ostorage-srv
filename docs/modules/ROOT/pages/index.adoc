@@ -46,6 +46,7 @@ on Tag which is identifying one or more objects to which the rule applies
 The value cannot be longer than 255 characters.
 - `authorization:enable`: default value is `true`, if set to `true` then access-control check is performed, if value is set to `false` then access-control check is overridden.
 - `authorization:enforce`: default value is `true`, if set to `true` then result of access-control-check is enforced, if value is set to `false` the result of access-control check if logged and ignored.
+- `redis:db-indexes:db-aclStore`: Due to limitation of header size of object metadata in S3, `meta.acl` is stored in redis and this configuration is used to set the DB index in Redis.
 
 [#API]
 == API
