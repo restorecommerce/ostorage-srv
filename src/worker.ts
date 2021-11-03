@@ -77,7 +77,10 @@ export class Worker {
       }
     }
 
-    const oss = new Service(cfg, logger, this.topics, this.authZ, idsService);
+    redisConfig.db = cfg.get('redis:db-indexes:db-aclStore');
+    const aclRedisClient = new Redis(redisConfig);
+    const oss = new Service(cfg, logger, this.topics, this.authZ, idsService,
+      aclRedisClient);
     this.oss = oss;
 
     // list of service names

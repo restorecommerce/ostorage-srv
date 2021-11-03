@@ -33,6 +33,7 @@
     "uuid": "^8.3.2"
   },
   "devDependencies": {
+    "@types/ioredis": "^4.28.0",
     "@types/lodash": "^4.14.172",
     "@types/mocha": "^9.0.0",
     "@types/node": "^16.9.1",

@@ -2,15 +2,15 @@ import * as _ from 'lodash';
 import * as aws from 'aws-sdk';
 import { Readable, Transform } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
-import { toObject } from '@restorecommerce/resource-base-interface';
 import {
   checkAccessRequest, unmarshallProtobufAny, marshallProtobufAny, ReadPolicyResponse
 } from './utils';
-import { PermissionDenied, Decision, AuthZAction, ACSAuthZ, Subject, updateConfig, DecisionResponse } from '@restorecommerce/acs-client';
+import { Decision, AuthZAction, ACSAuthZ, Subject, updateConfig, DecisionResponse } from '@restorecommerce/acs-client';
 import {
   Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse, CopyResponse,
   CopyResponseList, CopyObjectParams, Meta, DeleteResponse, ListResponse
 } from './interfaces';
+import { Redis } from 'ioredis';
 
 const META_OWNER = 'meta.owner';
 const EQ = 'eq';
@@ -28,8 +28,10 @@ export class Service {
   cfg: any;
   authZCheck: boolean;
   idsService: any;
+  aclRedisClient: Redis;
 
-  constructor(cfg: any, private logger: any, private topics: any, authZ: ACSAuthZ, idsService: any) {
+  constructor(cfg: any, private logger: any, private topics: any, authZ: ACSAuthZ,
+    idsService: any, aclRedisClient: Redis) {
     this.ossClient = new aws.S3(cfg.get('s3:client'));
     this.buckets = cfg.get('s3:buckets') || [];
     this.bucketsLifecycleConfigs = cfg.get('s3.bucketsLifecycleConfigs');
@@ -37,6 +39,7 @@ export class Service {
     this.cfg = cfg;
     this.authZCheck = cfg.get('authorization:enabled');
     this.idsService = idsService;
+    this.aclRedisClient = aclRedisClient;
   }
 
   async start(): Promise<void> {
@@ -169,9 +172,15 @@ export class Service {
     if (requestFilter && requestFilter.filters?.filter) {
       const filter = requestFilter.filters.filter[0];
       if (filter && filter.field == META_OWNER && filter.operation == EQ && filter.value) {
-        const MetaOwnerVal = object.meta.owner[1].value;
+        let metaOwnerVal;
+        const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
+        for (let idVal of object.owner) {
+          if (idVal.id === ownerInstanceURN) {
+            metaOwnerVal = idVal.value;
+          }
+        }
         // check only for the files matching the requested Owner Organizations
-        if (filter.value == MetaOwnerVal) {
+        if (filter.value == metaOwnerVal) {
           listResponse.response.push({
             payload: object,
             status: { id: object.object_name, code: 200, message: 'success' }
@@ -440,6 +449,11 @@ export class Service {
     if (headObject && headObject.Metadata) {
       if (headObject.Metadata.meta) {
         metaObj = JSON.parse(headObject.Metadata.meta);
+        // restore ACL from redis into metaObj
+        const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
+        if (acl) {
+          metaObj.acl = JSON.parse(acl);
+        }
       }
       if (headObject.Metadata.data) {
         data = JSON.parse(headObject.Metadata.data);
@@ -460,11 +474,6 @@ export class Service {
       }
       if (headObject.ContentType) {
         content_type = headObject.ContentType;
-        // capture meta data from response message
-        let metaObj;
-        if (headObject && headObject.Metadata && headObject.Metadata.meta) {
-          metaObj = JSON.parse(headObject.Metadata.meta);
-        }
         if (headObject.ContentLanguage) {
           content_language = headObject.ContentLanguage;
         }
@@ -504,13 +513,17 @@ export class Service {
       // When uploading files from the minio console the objects
       // have no meta stored so first check if meta is defined
       // before making the ACS request
-      if (
-        !_.isEmpty(metaObj) &&
-        !_.isEmpty(metaObj.owner) &&
-        !_.isEmpty(metaObj.owner[1]) &&
-        !_.isEmpty(metaObj.owner[1].value)
-      ) {
-        subject.scope = metaObj.owner[1].value;
+
+      if (metaObj && metaObj.owner && metaObj.owner.length > 0) {
+        let metaOwnerVal;
+        const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
+        for (let idVal of metaObj.owner) {
+          if (idVal.id === ownerInstanceURN) {
+            metaOwnerVal = idVal.value;
+          }
+        }
+        // restore scope for acs check from metaObj owner
+        subject.scope = metaOwnerVal;
       } else {
         this.logger.debug('Object metadata not found');
       }
@@ -821,21 +834,26 @@ export class Service {
         subject = { id: subjectID };
       }
 
-      // Only Key Value pairs where the Values must be strings can be stored
-      // inside the object metadata in S3, reason why we stringify the value fields.
-      // When sending over Kafka we send metadata as google.protobuf.Any,
-      // so we create a copy of the metaData object in unstringified state
-      let metaData = {
-        meta: JSON.stringify(meta),
-        data: JSON.stringify(data),
-        subject: JSON.stringify(subject),
-        key,
-      };
-
       let metaDataCopy = {
         meta,
         data,
         subject,
+        key,
+      };
+      // Only Key Value pairs where the Values must be strings can be stored
+      // inside the object metadata in S3, reason why we stringify the value fields.
+      // When sending over Kafka we send metadata as google.protobuf.Any,
+      // so we create a copy of the metaData object in unstringified state
+      if (meta && meta.acl) {
+        // store meta acl to redis
+        await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
+        delete meta.acl;
+      }
+
+      let metaData = {
+        meta: JSON.stringify(meta),
+        data: JSON.stringify(data),
+        subject: JSON.stringify(subject),
         key,
       };
 
@@ -1021,6 +1039,11 @@ export class Service {
         if (headObject && headObject.Metadata) {
           if (headObject.Metadata.meta) {
             metaObj = JSON.parse(headObject.Metadata.meta);
+            // restore ACL from redis into metaObj
+            const acl = await this.aclRedisClient.get(`${sourceBucketName}:${sourceKeyName}`);
+            if (acl) {
+              metaObj.acl = JSON.parse(acl);
+            }
           }
           if (headObject.Metadata.data) {
             data = JSON.parse(headObject.Metadata.data);
@@ -1032,9 +1055,16 @@ export class Service {
         if (!subject) {
           subject = {};
         }
-        if (metaObj && metaObj.owner && metaObj.owner[1]) {
-          // modifying the scope to check for read operation
-          subject.scope = metaObj.owner[1].value;
+        if (metaObj && metaObj.owner && metaObj.owner.length > 0) {
+          let metaOwnerVal;
+          const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
+          for (let idVal of metaObj.owner) {
+            if (idVal.id === ownerInstanceURN) {
+              metaOwnerVal = idVal.value;
+            }
+          }
+          // restore scope for acs check from metaObj owner
+          subject.scope = metaOwnerVal;
         }
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
@@ -1119,8 +1149,13 @@ export class Service {
               value: destinationSubjectScope
             }];
           }
+          if (meta.acl) {
+            // store meta acl to redis
+            await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
+            delete meta.acl;
+          }
           params.Metadata = {
-            meta: JSON.stringify(meta),
+            meta: JSON.stringify(meta), // TODO remove it and store to redis ?
             key,
             subject: JSON.stringify({ id: subject.id })
           };
@@ -1220,9 +1255,14 @@ export class Service {
               value: destinationSubjectScope
             }];
           }
+          if (meta.acl) {
+            // store meta acl to redis
+            await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
+            delete meta.acl;
+          }
           params.Metadata = {
             data: JSON.stringify(data),
-            meta: JSON.stringify(meta),
+            meta: JSON.stringify(meta), // TODO remove it and store to redis ?
             key,
             subject: JSON.stringify({ id: subject.id })
           };
@@ -1386,6 +1426,11 @@ export class Service {
     if (headObject && headObject.Metadata) {
       if (headObject.Metadata.meta) {
         metaObj = JSON.parse(headObject.Metadata.meta);
+        // restore ACL from redis into metaObj
+        const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
+        if (acl) {
+          metaObj.acl = JSON.parse(acl);
+        }
       }
       if (headObject.Metadata.data) {
         data = JSON.parse(headObject.Metadata.data);
@@ -1428,6 +1473,12 @@ export class Service {
       };
     }
     this.logger.info(`Successfully deleted object ${key} from bucket ${bucket}`);
+    // delete ACL key from redis if it exists
+    const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
+    if (acl) {
+      await this.aclRedisClient.del(`${bucket}:${key}`);
+      this.logger.info(`ACL data for ${bucket}:${key} key successfully deleted from redis`);
+    }
     return {
       status: [{ id: key, code: 200, message: 'success' }],
       operation_status: OPERATION_STATUS_SUCCESS
