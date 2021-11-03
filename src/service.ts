@@ -1040,7 +1040,13 @@ export class Service {
           if (headObject.Metadata.meta) {
             metaObj = JSON.parse(headObject.Metadata.meta);
             // restore ACL from redis into metaObj
-            const acl = await this.aclRedisClient.get(`${sourceBucketName}:${sourceKeyName}`);
+            let redisKey;
+            if (sourceKeyName.startsWith('/')) {
+              redisKey = sourceKeyName.substring(1);
+            } else {
+              redisKey = sourceKeyName;
+            }
+            const acl = await this.aclRedisClient.get(`${sourceBucketName}:${redisKey}`);
             if (acl) {
               metaObj.acl = JSON.parse(acl);
             }
@@ -1100,6 +1106,7 @@ export class Service {
         subject.scope = destinationSubjectScope;
         // target entity for ACS is destination bucket here
         // For Create ACS check use the meta ACL as passed from the subject
+        let sourceACL = metaObj.acl;
         metaObj.acl = meta?.acl ? meta.acl : [];
         resource.meta = metaObj;
         let writeAccessResponse = await checkAccessRequest(subject, resource,
@@ -1153,6 +1160,9 @@ export class Service {
             // store meta acl to redis
             await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
             delete meta.acl;
+          } else if (sourceACL && !_.isEmpty(sourceACL)) {
+            // store source acl to redis
+            await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(sourceACL));
           }
           params.Metadata = {
             meta: JSON.stringify(meta), // TODO remove it and store to redis ?
@@ -1259,6 +1269,9 @@ export class Service {
             // store meta acl to redis
             await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
             delete meta.acl;
+          } else if (sourceACL && !_.isEmpty(sourceACL)) {
+            // store source acl to redis
+            await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(sourceACL));
           }
           params.Metadata = {
             data: JSON.stringify(data),
