@@ -286,8 +286,9 @@ export class Service {
                 operation_status: { code: meta.status.code, message: meta.status.message }
               };
             }
-            const url = `//${bucket}/${meta.key}`;
-            const objectName = meta.key;
+            const metaKey = meta?.Metadata?.key;
+            const url = `//${bucket}/${metaKey}`;
+            const objectName = metaKey;
             let objectMeta;
             if (meta && meta.Metadata && meta.Metadata.meta) {
               objectMeta = JSON.parse(meta.Metadata.meta);
