@@ -7,6 +7,9 @@ import { createServiceConfig } from '@restorecommerce/service-config';
 import { createLogger } from '@restorecommerce/logger';
 import { GrpcClient } from '@restorecommerce/grpc-client';
 import { FilterOp } from '@restorecommerce/resource-base-interface';
+import { errors } from '@restorecommerce/chassis-srv';
+import { HeadObjectParams } from './interfaces';
+import { S3 } from 'aws-sdk';
 
 export interface HierarchicalScope {
   id: string;
@@ -96,7 +99,7 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
 
   // set entity on request to denote it as readRequest and whatIsAllowed check
   // is made instead of isAllowed for this
-  if(whatIsAllowedRequest) {
+  if (whatIsAllowedRequest) {
     data.entity = entity;
   }
 
@@ -132,4 +135,40 @@ export const marshallProtobufAny = (msg: any): any => {
 
 export const unmarshallProtobufAny = (msg: any): any => {
   return JSON.parse(msg.value.toString());
+};
+
+export const getHeadObject = async (headObjectParams: HeadObjectParams,
+  ossClient: S3, logger: any): Promise<any> => {
+  try {
+    return new Promise((resolve, reject) => {
+      ossClient.headObject(headObjectParams, (err: any, data) => {
+        if (err) {
+          logger.error('Error occurred while retrieving metadata for object',
+            {
+              Bucket: headObjectParams.Bucket, Key: headObjectParams.Key, error: err, errorStack: err.stack
+            });
+          // map the s3 error codes to standard chassis-srv errors
+          if (err.code === 'NotFound') {
+            err = new errors.NotFound('Specified key does not exist');
+            err.code = 404;
+          }
+          if (!err.message) {
+            err.message = err.name;
+          }
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      });
+    });
+  } catch (err) {
+    logger.error('Error occurred while retrieving metadata for object', err);
+    return {
+      status: {
+        id: headObjectParams.Key,
+        code: err.code || 500,
+        message: err.message
+      }
+    };
+  }
 };

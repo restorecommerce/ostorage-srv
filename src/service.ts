@@ -3,14 +3,20 @@ import * as aws from 'aws-sdk';
 import { Readable, Transform } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import {
-  checkAccessRequest, unmarshallProtobufAny, marshallProtobufAny, ReadPolicyResponse
+  checkAccessRequest, unmarshallProtobufAny,
+  marshallProtobufAny, ReadPolicyResponse, getHeadObject
 } from './utils';
-import { Decision, AuthZAction, ACSAuthZ, Subject, updateConfig, DecisionResponse } from '@restorecommerce/acs-client';
 import {
-  Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse, CopyResponse,
-  CopyResponseList, CopyObjectParams, Meta, DeleteResponse, ListResponse
+  Decision, AuthZAction, ACSAuthZ,
+  Subject, updateConfig, DecisionResponse
+} from '@restorecommerce/acs-client';
+import {
+  Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse,
+  CopyResponse, CopyResponseList, CopyObjectParams, Meta, DeleteResponse,
+  ListResponse, MoveRequestList, MoveResponseList, MoveResponse
 } from './interfaces';
 import { Redis } from 'ioredis';
+import { ListObjectsV2Request } from 'aws-sdk/clients/s3';
 
 const META_OWNER = 'meta.owner';
 const EQ = 'eq';
@@ -196,7 +202,7 @@ export class Service {
   }
 
   async list(call: Call<ListRequest>, context?: any): Promise<ListResponse> {
-    let { bucket, filters } = call.request;
+    let { bucket, filters, max_keys, prefix } = call.request;
 
     let subject = call.request.subject;
     let resource: any = { bucket, filters };
@@ -240,17 +246,23 @@ export class Service {
       operation_status: { code: 0, message: '' }
     };
 
-    for (const value of buckets) {
-      if (value != null) {
-        let bucketName = { Bucket: value };
+    for (const bucket of buckets) {
+      if (bucket != null) {
+        let request: ListObjectsV2Request = { Bucket: bucket };
+        if (max_keys) {
+          request.MaxKeys = max_keys;
+        }
+        if (prefix) {
+          request.Prefix = prefix;
+        }
         let objList: any;
         try {
           objList = await new Promise((resolve, reject) => {
-            this.ossClient.listObjectsV2(bucketName, (err, data) => {
+            this.ossClient.listObjectsV2(request, (err, data) => {
               if (err) {
                 this.logger.error('Error occurred while listing objects',
                   {
-                    bucket: bucketName, error: err, errorStack: err.stack
+                    bucket: request.Bucket, error: err, errorStack: err.stack
                   });
                 reject(err);
               } else {
@@ -266,40 +278,19 @@ export class Service {
 
         if (objList != null) {
           for (let eachObj of objList) {
-            const headObjectParams = { Bucket: value, Key: eachObj.Key };
+            const headObjectParams = { Bucket: bucket, Key: eachObj.Key };
             let meta: any;
-            try {
-              meta = await new Promise((resolve, reject) => {
-                this.ossClient.headObject(headObjectParams, (err: any, data) => {
-                  if (err) {
-                    this.logger.error('Error occurred while reading meta data for objects',
-                      {
-                        bucket: bucketName, error: err, errorStack: err.stack
-                      });
-                    // map the s3 error codes to standard chassis-srv errors
-                    if (err.code === 'NotFound') {
-                      err = new errors.NotFound('Specified key does not exist');
-                      err.code = 404;
-                    }
-                    if (!err.message) {
-                      err.message = err.name;
-                    }
-                    reject(err);
-                  } else {
-                    resolve(data.Metadata);
-                  }
-                });
-              });
-            } catch (err) {
+            meta = await getHeadObject(headObjectParams, this.ossClient, this.logger);
+            if (meta && meta.status) {
               return {
-                operation_status: { code: err.code, message: err.message }
+                operation_status: { code: meta.status.code, message: meta.status.message }
               };
             }
-            const url = `//${value}/${meta.key}`;
+            const url = `//${bucket}/${meta.key}`;
             const objectName = meta.key;
             let objectMeta;
-            if (meta && meta.meta) {
-              objectMeta = JSON.parse(meta.meta);
+            if (meta && meta.Metadata && meta.Metadata.meta) {
+              objectMeta = JSON.parse(meta.Metadata.meta);
             }
             let object = { object_name: objectName, url, meta: objectMeta };
             // authorization filter check
@@ -379,32 +370,21 @@ export class Service {
 
     // get metadata of the object stored in the S3 object storage
     const params = { Bucket: bucket, Key: key };
-    let headObject: any;
-    headObject = await new Promise((resolve, reject) => {
-      this.ossClient.headObject(params, async (err: any, data) => {
-        if (err) {
-          // map the s3 error codes to standard chassis-srv errors
-          if (err.code === 'NotFound') {
-            err = new errors.NotFound('Specified key does not exist');
-            err.code = 404;
+    let headObject: any = await getHeadObject(params, this.ossClient, this.logger);
+    if (headObject.status) {
+      await call.write({
+        response: {
+          payload: null,
+          status: {
+            id: key,
+            code: headObject.status.code,
+            message: headObject.status.message
           }
-          this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
-          await call.write({
-            response: {
-              payload: null,
-              status: {
-                id: key,
-                code: err.code,
-                message: err.message
-              }
-            },
-            operation_status: OPERATION_STATUS_SUCCESS
-          });
-          return await call.end();
-        }
-        resolve(data);
+        },
+        operation_status: OPERATION_STATUS_SUCCESS
       });
-    });
+      return await call.end();
+    }
 
     // get object tagging of the object stored in the S3 object storage
     let objectTagging: any;
@@ -956,6 +936,73 @@ export class Service {
     }
   }
 
+  async move(call: Call<MoveRequestList>, context?: any): Promise<MoveResponseList> {
+    let { items, subject } = call.request;
+    let moveResponse: MoveResponseList = {
+      response: [],
+      operation_status: { code: 0, message: '' }
+    };
+    if (_.isEmpty(items)) {
+      moveResponse.operation_status = { code: 400, message: 'Items missing in request' };
+      return moveResponse;
+    }
+    for (let item of items) {
+      if (item.sourcePath) {
+        (item as any).copySource = item.sourcePath;
+      }
+      // No need for ACS check as both Read and Create access check are made in Copy operation
+      const copyResponse = await this.copy({ request: (call.request as any) }, context);
+      // if copyResponse is success for each of the object then delete the sourcePath
+      if (copyResponse?.operation_status?.code === 200) {
+        for (let response of copyResponse.response) {
+          if (response && response?.status?.code === 200) {
+            // delete sourcePath Object
+            const payload = response.payload;
+            const deleteResponse = await this.delete({
+              request: {
+                bucket: payload.bucket, key: payload.key, subject
+              }
+            } as any);
+
+            let deleteResponseCode, deleteResponseMessage;
+            if (deleteResponse && deleteResponse.status && deleteResponse.status[0]) {
+              deleteResponseCode = deleteResponse.status[0].code;
+              deleteResponseMessage = deleteResponse.status[0].message;
+            }
+
+            if(deleteResponseCode === 200) {
+              if (response.payload.copySource) {
+                (response.payload as any).sourcePath = response.payload.copySource;
+                delete response.payload.copySource;
+              }
+              moveResponse.response.push({
+                payload: (response.payload as any),
+                status: deleteResponse.status[0]
+              });
+            } else {
+              // fail status
+              moveResponse.response.push({
+                status: {
+                  id: payload.key,
+                  code: deleteResponseCode,
+                  message: deleteResponseMessage
+                }
+              });
+            }
+          } else {
+            // fail status
+            moveResponse.response.push({
+              status: response.status
+            });
+          }
+        }
+      } else {
+        moveResponse.operation_status = copyResponse.operation_status;
+      }
+    }
+    return moveResponse;
+  }
+
   async copy(call: any, callback: any): Promise<CopyResponseList> {
     const request = await call.request;
     let bucket: string;
@@ -1000,35 +1047,13 @@ export class Service {
         };
 
         const headObjectParams = { Bucket: sourceBucketName, Key: sourceKeyName };
-        let headObject: any;
-        try {
-          headObject = await new Promise((resolve, reject) => {
-            this.ossClient.headObject(headObjectParams, (err: any, data) => {
-              if (err) {
-                this.logger.error('Error occurred while retrieving metadata for object:',
-                  {
-                    Bucket: sourceBucketName, Key: sourceKeyName, error: err, errorStack: err.stack
-                  });
-                // map the s3 error codes to standard chassis-srv errors
-                if (err.code === 'NotFound') {
-                  err = new errors.NotFound('Specified key does not exist');
-                  err.code = 404;
-                }
-                if (!err.message) {
-                  err.message = err.name;
-                }
-                reject(err);
-              } else {
-                resolve(data);
-              }
-            });
-          });
-        } catch (err) {
+        let headObject: any = await getHeadObject(headObjectParams, this.ossClient, this.logger);
+        if (headObject && headObject.status) {
           grpcResponse.response.push({
             status: {
               id: sourceKeyName,
-              code: err.code || 500,
-              message: err.message
+              code: headObject.status.code,
+              message: headObject.status.message
             }
           });
           continue;
@@ -1265,7 +1290,7 @@ export class Service {
               value: destinationSubjectScope
             }];
           }
-          if (meta && meta.acl&& !_.isEmpty(meta.acl)) {
+          if (meta && meta.acl && !_.isEmpty(meta.acl)) {
             // store meta acl to redis
             await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
             delete meta.acl;
@@ -1405,30 +1430,11 @@ export class Service {
     }
 
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
-    let headObject: any;
     let resources = { Bucket: bucket, Key: key };
-    try {
-      headObject = await new Promise((resolve, reject) => {
-        this.ossClient.headObject(resources, async (err: any, data) => {
-          if (err) {
-            this.logger.error('Error occurred while retrieving metadata for key:', { Key: key, error: err });
-            // map the s3 error codes to standard chassis-srv errors
-            if (err.code === 'NotFound') {
-              err = new errors.NotFound('Specified key does not exist');
-              err.code = 404;
-            }
-            if (!err.message) {
-              err.message = err.name;
-            }
-            reject(err);
-          } else {
-            resolve(data);
-          }
-        });
-      });
-    } catch (err) {
+    let headObject: any = await getHeadObject(resources, this.ossClient, this.logger);
+    if (headObject && headObject.status) {
       return {
-        status: [{ id: key, code: err.code, message: err.message }],
+        status: [{ id: key, code: headObject.status.code, message: headObject.status.message }],
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }

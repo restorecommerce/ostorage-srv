@@ -55,6 +55,8 @@ export interface ListRequest {
   bucket: string;
   filters: FilterOp;
   subject?: Subject;
+  max_keys?: number;
+  prefix?: string;
 }
 
 export interface ObjectData {
@@ -152,6 +154,37 @@ export interface CopyResponseList {
   operation_status?: OperationStatus;
 }
 
+export interface MoveRequest {
+  sourcePath: string;
+  bucket: string;
+  key: string;
+  meta?: Meta;
+  options?: Options;
+}
+
+export interface MoveResponse {
+  bucket: string;
+  sourcePath: string;
+  key: string;
+  meta: Meta;
+  options: Options;
+}
+
+export interface MoveRequestList {
+  items: MoveRequest[];
+  subject?: Subject;
+}
+
+export interface MoveResponseWithPayloadStatus {
+  payload?: MoveResponse;
+  status?: Status;
+}
+
+export interface MoveResponseList {
+  response?: MoveResponseWithPayloadStatus[];
+  operation_status?: OperationStatus;
+}
+
 // Parameters passed to the S3 copyObject function
 // When replacing an object's metadata ( same object inside the same bucket) either "tagging" or "metadata" is required.
 // When copying the object to another bucket these two params can be skipped but object will be copied with no metadata.
@@ -189,4 +222,9 @@ export interface Meta {
 
 export interface Call<T = GetRequest | DeleteRequest | PutRequest> {
   request: T;
+}
+
+export interface HeadObjectParams{
+  Bucket: string;
+  Key: string;
 }
