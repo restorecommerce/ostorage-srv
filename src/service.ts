@@ -175,7 +175,7 @@ export class Service {
 
   private filterObjects(requestFilter, object, listResponse) {
     // if filter is provided return data based on filter
-    if (requestFilter && requestFilter?.filter) {
+    if (requestFilter && requestFilter?.filter && !_.isEmpty(requestFilter?.filter)) {
       const filter = requestFilter.filter[0];
       if (filter && filter.field == META_OWNER && filter.operation == EQ && filter.value) {
         let metaOwnerVal;
