@@ -175,22 +175,24 @@ export class Service {
 
   private filterObjects(requestFilter, object, listResponse) {
     // if filter is provided return data based on filter
-    if (requestFilter && requestFilter.filters?.filter) {
-      const filter = requestFilter.filters.filter[0];
+    if (requestFilter && requestFilter?.filter) {
+      const filter = requestFilter.filter[0];
       if (filter && filter.field == META_OWNER && filter.operation == EQ && filter.value) {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-        for (let idVal of object.owner) {
-          if (idVal.id === ownerInstanceURN) {
-            metaOwnerVal = idVal.value;
+        if (object && object.meta && object.meta.owner && _.isArray(object.meta.owner)) {
+          for (let idVal of object.meta.owner) {
+            if (idVal.id === ownerInstanceURN) {
+              metaOwnerVal = idVal.value;
+            }
           }
-        }
-        // check only for the files matching the requested Owner Organizations
-        if (filter.value == metaOwnerVal) {
-          listResponse.response.push({
-            payload: object,
-            status: { id: object.object_name, code: 200, message: 'success' }
-          });
+          // check only for the files matching the requested Owner Organizations
+          if (filter.value == metaOwnerVal) {
+            listResponse.response.push({
+              payload: object,
+              status: { id: object.object_name, code: 200, message: 'success' }
+            });
+          }
         }
       }
     } else { // else return all data
@@ -961,7 +963,7 @@ export class Service {
         sourceKeyName = copySourceStr.substr(copySourceStr.indexOf('/'), copySourceStr.length);
       }
       // No need for ACS check as both Read and Create access check are made in Copy operation
-      const copyResponse = await this.copy({ request: { items: [item], subject} }, context);
+      const copyResponse = await this.copy({ request: { items: [item], subject } }, context);
       // if copyResponse is success for each of the object then delete the sourcePath
       if (copyResponse?.operation_status?.code === 200) {
         for (let response of copyResponse.response) {
@@ -980,7 +982,7 @@ export class Service {
               deleteResponseMessage = deleteResponse.status[0].message;
             }
 
-            if(deleteResponseCode === 200) {
+            if (deleteResponseCode === 200) {
               if (response.payload.copySource) {
                 (response.payload as any).sourcePath = response.payload.copySource;
                 delete response.payload.copySource;
@@ -1041,7 +1043,7 @@ export class Service {
 
         // Regex to extract bucket name and key from copySource
         // ex: copySource= /bucketName/sample-directory/objectName.txt
-        if(!copySource) {
+        if (!copySource) {
           grpcResponse.response.push({
             status: {
               id: key,
