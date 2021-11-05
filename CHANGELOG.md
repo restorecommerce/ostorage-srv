@@ -1,3 +1,7 @@
+## 0.2.6 (November 5th, 2021)
+
+- added move api and added prefix and max_keys for list api
+
 ## 0.2.5 (November 3rd, 2021)
 
 - store ACL data into redis instead of object metadata in S3 (due to header size limitation)
