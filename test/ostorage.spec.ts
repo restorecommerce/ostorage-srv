@@ -437,23 +437,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       sleep.sleep(3);
     });
 
-    it('Should store the data to storage server using request streaming and' +
-      ' validate objectUploaded event once object is stored', async () => {
-        // Create an event listener for the "objectUploaded" event and when an
-        // object is uploaded, consume the event and validate the fields being sent.
-        const listener = function (msg: any, context: any, config: any, eventName: string): void {
-          if (eventName == 'objectUploaded') {
-            const key = msg.key;
-            const bucket = msg.bucket;            
-            should.exist(key);
-            should.exist(bucket);
-            key.should.equal('config.json');
-            bucket.should.equal('test');
-          }
-        };
-        topic = await events.topic('io.restorecommerce.ostorage');
-        topic.on('objectUploaded', listener);
-
+    it('Should store the data to storage server using request streaming', async () => {
         const readStream = fs.createReadStream('./test/cfg/testObject.json');
 
         const transformBuffObj = () => {
@@ -476,7 +460,6 @@ describe('testing ostorage-srv with ACS disabled', () => {
 
 
         const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
-
         should.exist(putResponse.response.payload.bucket);
         should.exist(putResponse.response.payload.key);
         should.exist(putResponse.response.payload.url);
@@ -619,9 +602,10 @@ describe('testing ostorage-srv with ACS disabled', () => {
             data.operation_status.message.should.equal('success');
           }
         });
-  
+
         await new Promise((resolve, reject) => {
-          call.on('end', () => {
+          call.on('end', async () => {
+            await topic.removeListener('objectDownloadRequested', listener);
             resolve(0);
           });
         });
@@ -694,16 +678,145 @@ describe('testing ostorage-srv with ACS disabled', () => {
       sleep.sleep(3);
     });
 
+    it('should upload another object and validate objectUploaded event and list both objects', async () => {
+      // Create an event listener for the "objectUploaded" event and when an
+      // object is uploaded, consume the event and validate the fields being sent.
+      const listener = function (msg: any, context: any, config: any, eventName: string): void {
+        if (eventName == 'objectUploaded') {
+          const key = msg.key;
+          const bucket = msg.bucket;
+          should.exist(key);
+          should.exist(bucket);
+          key.should.equal('second_config.json');
+          bucket.should.equal('test');
+        }
+      };
+      topic = await events.topic('io.restorecommerce.ostorage');
+      topic.on('objectUploaded', listener);
+
+      const readStream = fs.createReadStream('./test/cfg/config.json');
+      const transformBuffObj = () => {
+        return new Transform({
+          objectMode: true,
+          transform: (chunk, _, done) => {
+            // object buffer
+            const data = {
+              bucket: 'test',
+              key: 'second_config.json',
+              object: chunk,
+              meta,
+              options,
+              subject: { scope: 'orgC' }
+            };
+            done(null, data);
+          }
+        });
+      };
+      const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
+      let listResponse = await ostorageService.list({
+        bucket: 'test'
+      });
+      should.exist(listResponse);
+      should.exist(listResponse.response);
+      should.exist(listResponse.response[0].payload);
+      should.exist(listResponse.response[1].payload);
+      should(listResponse.response).length(2);
+      listResponse.operation_status.code.should.equal(200);
+      listResponse.operation_status.message.should.equal('success');
+      sleep.sleep(3);
+    });
+
+    it('should list one object with prefix', async () => {
+      let listResponse = await ostorageService.list({
+        bucket: 'test',
+        prefix: 'con'
+      });
+      should.exist(listResponse);
+      should.exist(listResponse.response);
+      should.exist(listResponse.response[0].payload);
+      should(listResponse.response).length(1);
+      listResponse.operation_status.code.should.equal(200);
+      listResponse.operation_status.message.should.equal('success');
+      sleep.sleep(3);
+    });
+
+    it('should list one object with max keys', async () => {
+      let listResponse = await ostorageService.list({
+        bucket: 'test',
+        max_keys: 1
+      });
+      should.exist(listResponse);
+      should.exist(listResponse.response);
+      should.exist(listResponse.response[0].payload);
+      should(listResponse.response).length(1);
+      listResponse.operation_status.code.should.equal(200);
+      listResponse.operation_status.message.should.equal('success');
+      sleep.sleep(3);
+    });
+
+    it('should move objects from one bucket to another', async () => {
+      let moveResponse = await ostorageService.move({
+       items: [{
+         bucket: 'test2',
+         key: 'config_new.json',
+         sourcePath: 'test/config.json'
+       }, {
+        bucket: 'test2',
+        key: 'second_config_new.json',
+        sourcePath: 'test/second_config.json'
+       }]
+      });
+      // validate moveResponse
+      should.exist(moveResponse.response);
+      should(moveResponse.response).length(2);
+      should.exist(moveResponse.response[0].payload);
+      should.exist(moveResponse.response[1].payload);
+      should.exist(moveResponse.response[0].status.code);
+      moveResponse.response[0].status.code.should.equal(200);
+      moveResponse.response[1].status.code.should.equal(200);
+
+      // validate test bucket response should be empty
+      let listResponse = await ostorageService.list({
+        bucket: 'test',
+      });
+      should(listResponse.response).empty;
+      listResponse.operation_status.code.should.equal(200);
+
+      // validate test2 bucket response should contain 2 objects
+      let listResponse2 = await ostorageService.list({
+        bucket: 'test2',
+      });
+      should.exist(listResponse2);
+      should.exist(listResponse2.response);
+      should.exist(listResponse2.response[0].payload);
+      should.exist(listResponse2.response[1].payload);
+      listResponse2.response[0].payload.url.should.equal('//test2/config_new.json');
+      listResponse2.response[1].payload.url.should.equal('//test2/second_config_new.json');
+      should(listResponse2.response).length(2);
+      listResponse2.operation_status.code.should.equal(200);
+      listResponse2.operation_status.message.should.equal('success');
+      sleep.sleep(3);
+    });
+
     it('should delete the object', async () => {
       let delResponse = await ostorageService.delete({
-        bucket: 'test',
-        key: 'config.json'
+        bucket: 'test2',
+        key: 'config_new.json'
       });
-      delResponse.status[0].id.should.equal('config.json');
+      delResponse.status[0].id.should.equal('config_new.json');
       delResponse.status[0].code.should.equal(200);
       delResponse.status[0].message.should.equal('success');
       delResponse.operation_status.code.should.equal(200);
       delResponse.operation_status.message.should.equal('success');
+      let delResponse1 = await ostorageService.delete({
+        bucket: 'test2',
+        key: 'second_config_new.json'
+      });
+      delResponse1.status[0].id.should.equal('second_config_new.json');
+      delResponse1.status[0].code.should.equal(200);
+      delResponse1.status[0].message.should.equal('success');
+      delResponse1.operation_status.code.should.equal(200);
+      delResponse1.operation_status.message.should.equal('success');
     });
 
   });

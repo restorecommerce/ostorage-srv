@@ -251,6 +251,11 @@
           "transport": [
             "grpcOstorage"
           ]
+        },
+        "move":{
+          "transport": [
+            "grpcOstorage"
+          ]
         }
       },
       "io-restorecommerce-ostorage-reflection": {

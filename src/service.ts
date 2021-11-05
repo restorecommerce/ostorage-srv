@@ -947,12 +947,21 @@ export class Service {
       moveResponse.operation_status = { code: 400, message: 'Items missing in request' };
       return moveResponse;
     }
+
     for (let item of items) {
+      let sourceBucketName, sourceKeyName;
       if (item.sourcePath) {
         (item as any).copySource = item.sourcePath;
+        const copySource = item.sourcePath;
+        let copySourceStr = copySource;
+        if (copySource.startsWith('/')) {
+          copySourceStr = copySource.slice(1, copySource.length);
+        }
+        sourceBucketName = copySourceStr.substring(0, copySourceStr.indexOf('/'));
+        sourceKeyName = copySourceStr.substr(copySourceStr.indexOf('/'), copySourceStr.length);
       }
       // No need for ACS check as both Read and Create access check are made in Copy operation
-      const copyResponse = await this.copy({ request: (call.request as any) }, context);
+      const copyResponse = await this.copy({ request: { items: [item], subject} }, context);
       // if copyResponse is success for each of the object then delete the sourcePath
       if (copyResponse?.operation_status?.code === 200) {
         for (let response of copyResponse.response) {
@@ -961,7 +970,7 @@ export class Service {
             const payload = response.payload;
             const deleteResponse = await this.delete({
               request: {
-                bucket: payload.bucket, key: payload.key, subject
+                bucket: sourceBucketName, key: sourceKeyName, subject
               }
             } as any);
 
@@ -1013,7 +1022,6 @@ export class Service {
     let options: Options;
     let grpcResponse: CopyResponseList = { response: [], operation_status: { code: 0, message: '' } };
     let copyObjectResult;
-
     let subject = call.request.subject;
     let destinationSubjectScope; // scope for destination bucket
     if (subject && subject.scope) {
@@ -1033,6 +1041,16 @@ export class Service {
 
         // Regex to extract bucket name and key from copySource
         // ex: copySource= /bucketName/sample-directory/objectName.txt
+        if(!copySource) {
+          grpcResponse.response.push({
+            status: {
+              id: key,
+              code: 400,
+              message: 'missing source path for copy operation'
+            }
+          });
+          continue;
+        }
         let copySourceStr = copySource;
         if (copySource.startsWith('/')) {
           copySourceStr = copySource.slice(1, copySource.length);

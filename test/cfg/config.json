@@ -10,7 +10,8 @@
       "s3ForcePathStyle": true
     },
     "buckets": [
-      "test"
+      "test",
+      "test2"
     ]
   },
   "logger": {
@@ -181,6 +182,11 @@
           ]
         },
         "copy": {
+          "transport": [
+            "grpcOstorage"
+          ]
+        },
+        "move":{
           "transport": [
             "grpcOstorage"
           ]
