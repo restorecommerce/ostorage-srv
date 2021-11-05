@@ -1,6 +1,7 @@
 ## 0.2.8 (November 5th, 2021)
 
 - fix list filter
+- fix operation status response for move operation
 
 ## 0.2.7 (November 5th, 2021)
 
