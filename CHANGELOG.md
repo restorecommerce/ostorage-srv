@@ -1,3 +1,7 @@
+## 0.2.8 (November 5th, 2021)
+
+- fix list filter
+
 ## 0.2.7 (November 5th, 2021)
 
 - up acs-client dep
