@@ -1012,6 +1012,7 @@ export class Service {
         moveResponse.operation_status = copyResponse.operation_status;
       }
     }
+    moveResponse.operation_status = { code: 200, message: 'success' };
     return moveResponse;
   }
 
