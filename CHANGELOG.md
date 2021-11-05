@@ -1,3 +1,7 @@
+## 0.2.7 (November 5th, 2021)
+
+- up acs-client dep
+
 ## 0.2.6 (November 5th, 2021)
 
 - added move api and added prefix and max_keys for list api
