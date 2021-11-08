@@ -155,7 +155,7 @@ export interface CopyResponseList {
 }
 
 export interface MoveRequest {
-  sourcePath: string;
+  sourceObject: string;
   bucket: string;
   key: string;
   meta?: Meta;
@@ -164,7 +164,7 @@ export interface MoveRequest {
 
 export interface MoveResponse {
   bucket: string;
-  sourcePath: string;
+  sourceObject: string;
   key: string;
   meta: Meta;
   options: Options;

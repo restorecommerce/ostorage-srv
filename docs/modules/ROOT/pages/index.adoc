@@ -179,7 +179,7 @@ Requests are performed using `io.restorecommerce.ostorage.MoveRequestList` proto
 | Field | Type | Label | Description
 | bucket | string | required | destination bucket name to move the Object
 | key | string | required | destination Object key name
-| sourcePath | string | required | source bucket and key name
+| sourceObject | string | required | source bucket and key name
 | meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | metadata attached to Object
 | options | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.ostorage.Options`] | optional | headers attached to Object
 |==============================================================================================================================================
@@ -210,7 +210,7 @@ Requests are performed using `io.restorecommerce.ostorage.MoveRequestList` proto
 | Field | Type | Label | Description
 | bucket | string | required | destination bucket name
 | key | string | required | destination Object key name
-| sourcePath | string | required | source bucket and key name
+| sourceObject | string | required | source bucket and key name
 | meta | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] | optional | metadata attached to Object
 | options | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/ostorage.proto[`io.restorecommerce.ostorage.Options`] | optional | headers attached to Object
 |==============================================================================================================================================

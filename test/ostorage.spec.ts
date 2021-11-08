@@ -759,11 +759,11 @@ describe('testing ostorage-srv with ACS disabled', () => {
        items: [{
          bucket: 'test2',
          key: 'config_new.json',
-         sourcePath: 'test/config.json'
+         sourceObject: 'test/config.json'
        }, {
         bucket: 'test2',
         key: 'second_config_new.json',
-        sourcePath: 'test/second_config.json'
+        sourceObject: 'test/second_config.json'
        }]
       });
       // validate moveResponse

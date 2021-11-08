@@ -952,9 +952,9 @@ export class Service {
 
     for (let item of items) {
       let sourceBucketName, sourceKeyName;
-      if (item.sourcePath) {
-        (item as any).copySource = item.sourcePath;
-        const copySource = item.sourcePath;
+      if (item.sourceObject) {
+        (item as any).copySource = item.sourceObject;
+        const copySource = item.sourceObject;
         let copySourceStr = copySource;
         if (copySource.startsWith('/')) {
           copySourceStr = copySource.slice(1, copySource.length);
@@ -964,11 +964,11 @@ export class Service {
       }
       // No need for ACS check as both Read and Create access check are made in Copy operation
       const copyResponse = await this.copy({ request: { items: [item], subject } }, context);
-      // if copyResponse is success for each of the object then delete the sourcePath
+      // if copyResponse is success for each of the object then delete the sourceObject
       if (copyResponse?.operation_status?.code === 200) {
         for (let response of copyResponse.response) {
           if (response && response?.status?.code === 200) {
-            // delete sourcePath Object
+            // delete sourceObject Object
             const payload = response.payload;
             const deleteResponse = await this.delete({
               request: {
@@ -984,7 +984,7 @@ export class Service {
 
             if (deleteResponseCode === 200) {
               if (response.payload.copySource) {
-                (response.payload as any).sourcePath = response.payload.copySource;
+                (response.payload as any).sourceObject = response.payload.copySource;
                 delete response.payload.copySource;
               }
               moveResponse.response.push({
