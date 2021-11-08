@@ -1,3 +1,7 @@
+## 0.2.10 (November 8th, 2021)
+
+- rename sourcePath to sourceObject for move rpc
+
 ## 0.2.9 (November 5th, 2021)
 
 - fix operation status response for move operation
