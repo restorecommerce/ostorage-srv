@@ -303,7 +303,7 @@ export class Service {
               // then its considred a match for further filtering based on filter field if it exists
               let match = false;
               let ownerInst;
-              if (objectMeta.owner) {
+              if (objectMeta && objectMeta.owner) {
                 for (let idVal of objectMeta.owner) {
                   if (idVal.id === ownerIndictaorEntURN && idVal.value === ownerIndicatorEntity) {
                     match = true;

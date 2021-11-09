@@ -1,3 +1,7 @@
+## 0.2.11 (November 8th, 2021)
+
+- added check condition for object meta
+
 ## 0.2.10 (November 8th, 2021)
 
 - rename sourcePath to sourceObject for move rpc
