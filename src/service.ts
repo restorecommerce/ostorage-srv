@@ -1121,7 +1121,7 @@ export class Service {
         }
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
-        let resource = { key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
+        let resource = { id: key, key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
         let acsResponse: DecisionResponse; // isAllowed check for Read operation
         try {
           // target entity for ACS is source bucket here

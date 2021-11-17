@@ -1,3 +1,7 @@
+## 0.2.12 (November 17th, 2021)
+
+- added resource id for acs-check for copy operation
+
 ## 0.2.11 (November 8th, 2021)
 
 - added check condition for object meta
