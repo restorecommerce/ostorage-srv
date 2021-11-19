@@ -736,7 +736,8 @@ export class Service {
       }
 
       let resource = { key, bucket, meta, options };
-      this.createMetadata(resource, subject);
+      resource = this.createMetadata(resource, subject);
+      const metaWithOwner = resource.meta;
       // created meta if it was not provided in request
       let acsResponse: DecisionResponse;
       try {
@@ -757,7 +758,6 @@ export class Service {
           operation_status: OPERATION_STATUS_SUCCESS
         };
       }
-      meta = resource.meta;
       if (acsResponse.decision != Decision.PERMIT) {
         return {
           response: {
@@ -783,7 +783,7 @@ export class Service {
         key,
         bucket,
         readable, // readable stream
-        meta,
+        metaWithOwner,
         options,
         subjectID
       );

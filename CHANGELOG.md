@@ -1,3 +1,7 @@
+## 0.2.13 (November 19th, 2021)
+
+- fix put for meta owner information
+
 ## 0.2.12 (November 17th, 2021)
 
 - added resource id for acs-check for copy operation
