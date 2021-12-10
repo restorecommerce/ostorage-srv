@@ -1,3 +1,7 @@
+## 0.2.16 (December 10th, 2021)
+
+- fixed custom arguments
+
 ## 0.2.15 (December 10th, 2021)
 
 - made ctx mandatory for exposed grpc api's (prevent errors for internal service calls)

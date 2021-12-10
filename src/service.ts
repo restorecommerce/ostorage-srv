@@ -4,10 +4,10 @@ import { Readable, Transform } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import {
   checkAccessRequest, unmarshallProtobufAny,
-  marshallProtobufAny, ReadPolicyResponse, getHeadObject
+  marshallProtobufAny, getHeadObject
 } from './utils';
 import {
-  Decision, AuthZAction, ACSAuthZ,
+  Decision, AuthZAction, ACSAuthZ, PolicySetRQResponse,
   Subject, updateConfig, DecisionResponse, Operation
 } from '@restorecommerce/acs-client';
 import {
@@ -208,7 +208,7 @@ export class Service {
 
     let subject = call.request.subject;
     let resource: any = { bucket, filters };
-    let acsResponse: ReadPolicyResponse; // WhatisAllowed check for Read operation
+    let acsResponse: PolicySetRQResponse; // WhatisAllowed check for Read operation
     try {
       // target entity for ACS is bucket name here
       ctx.subject = subject;
@@ -227,7 +227,10 @@ export class Service {
     if (acsResponse.decision != Decision.PERMIT) {
       return { operation_status: acsResponse.operation_status };
     }
-    const customArgs = acsResponse?.custom_query_args?.custom_arguments;
+    let customArgs;
+    if(acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+      customArgs = acsResponse.custom_query_args[0].custom_arguments;
+    }
     const ownerIndictaorEntURN = this.cfg.get('authorization:urns:ownerIndicatoryEntity');
     const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
     let customArgsFilter, ownerValues, ownerIndicatorEntity;

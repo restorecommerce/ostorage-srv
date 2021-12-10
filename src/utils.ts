@@ -1,13 +1,11 @@
 import {
-  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject,
-  DecisionResponse, Operation, Obligation
+  AuthZAction, Decision, PolicySetRQResponse, accessRequest, Subject,
+  DecisionResponse, Operation
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
-import { Service } from './service';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { createLogger } from '@restorecommerce/logger';
 import { GrpcClient } from '@restorecommerce/grpc-client';
-import { FilterOp } from '@restorecommerce/resource-base-interface';
 import { errors } from '@restorecommerce/chassis-srv';
 import { HeadObjectParams } from './interfaces';
 import { S3 } from 'aws-sdk';
@@ -27,29 +25,11 @@ export interface Response {
   };
 }
 
-export interface AccessResponse {
-  decision: Decision;
-  obligation?: Obligation[];
-  operation_status: {
-    code: number;
-    message: string;
-  };
-}
-
 export interface FilterType {
   field?: string;
   operation?: 'lt' | 'lte' | 'gt' | 'gte' | 'eq' | 'in' | 'isEmpty' | 'iLike';
   value?: string;
   type?: 'string' | 'boolean' | 'number' | 'date' | 'array';
-}
-
-export interface ReadPolicyResponse extends AccessResponse {
-  policy_sets?: PolicySetRQ[];
-  filters?: FilterOp[];
-  custom_query_args?: {
-    custom_queries: any;
-    custom_arguments: any;
-  };
 }
 
 // Create a ids client instance
@@ -112,7 +92,7 @@ export interface GQLClientContext {
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function checkAccessRequest(ctx: GQLClientContext, resource: Resource[], action: AuthZAction,
-  operation: Operation): Promise<DecisionResponse | ReadPolicyResponse> {
+  operation: Operation): Promise<DecisionResponse | PolicySetRQResponse> {
   let subject = ctx.subject;
   // resolve subject id using findByToken api and update subject with id
   let dbSubject;
@@ -126,7 +106,7 @@ export async function checkAccessRequest(ctx: GQLClientContext, resource: Resour
     }
   }
 
-  let result: DecisionResponse | ReadPolicyResponse;
+  let result: DecisionResponse | PolicySetRQResponse;
   try {
     result = await accessRequest(subject, resource, action, ctx, operation);
   } catch (err) {
