@@ -198,7 +198,7 @@ describe('testing ostorage-srv with ACS enabled', () => {
       sleep.sleep(3);
     });
     it('With valid subject scope should be able to list the object', async () => {
-      let result = await ostorageService.list({ subject });
+      let result = await ostorageService.list({ bucket: 'test', subject });
       should.exist(result.response);
       result.response.length.should.equal(1);
     });
@@ -438,50 +438,50 @@ describe('testing ostorage-srv with ACS disabled', () => {
     });
 
     it('Should store the data to storage server using request streaming', async () => {
-        const readStream = fs.createReadStream('./test/cfg/testObject.json');
+      const readStream = fs.createReadStream('./test/cfg/testObject.json');
 
-        const transformBuffObj = () => {
-          return new Transform({
-            objectMode: true,
-            transform: (chunk, _, done) => {
-              // object buffer
-              const data = {
-                bucket: 'test',
-                key: 'config.json',
-                object: chunk,
-                meta,
-                options,
-                subject: { scope: 'orgC' }
-              };
-              done(null, data);
-            }
-          });
-        };
+      const transformBuffObj = () => {
+        return new Transform({
+          objectMode: true,
+          transform: (chunk, _, done) => {
+            // object buffer
+            const data = {
+              bucket: 'test',
+              key: 'config.json',
+              object: chunk,
+              meta,
+              options,
+              subject: { scope: 'orgC' }
+            };
+            done(null, data);
+          }
+        });
+      };
 
 
-        const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
-        should.exist(putResponse.response.payload.bucket);
-        should.exist(putResponse.response.payload.key);
-        should.exist(putResponse.response.payload.url);
-        should.exist(putResponse.response.payload.meta);
-        should.exist(putResponse.response.payload.tags);
-        putResponse.response.payload.key.should.equal('config.json');
-        putResponse.response.payload.bucket.should.equal('test');
-        putResponse.response.payload.url.should.equal('//test/config.json');
+      const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
+      should.exist(putResponse.response.payload.bucket);
+      should.exist(putResponse.response.payload.key);
+      should.exist(putResponse.response.payload.url);
+      should.exist(putResponse.response.payload.meta);
+      should.exist(putResponse.response.payload.tags);
+      putResponse.response.payload.key.should.equal('config.json');
+      putResponse.response.payload.bucket.should.equal('test');
+      putResponse.response.payload.url.should.equal('//test/config.json');
 
-        // check meta
-        putResponse.response.payload.meta.owner.should.deepEqual(meta.owner);
+      // check meta
+      putResponse.response.payload.meta.owner.should.deepEqual(meta.owner);
 
-        // check tags
-        putResponse.response.payload.tags[0].id.should.equal('id_1');
-        putResponse.response.payload.tags[0].value.should.equal('value_1');
-        putResponse.response.payload.tags[1].id.should.equal('id_2');
-        putResponse.response.payload.tags[1].value.should.equal('value_2');
+      // check tags
+      putResponse.response.payload.tags[0].id.should.equal('id_1');
+      putResponse.response.payload.tags[0].value.should.equal('value_1');
+      putResponse.response.payload.tags[1].id.should.equal('id_2');
+      putResponse.response.payload.tags[1].value.should.equal('value_2');
 
-        // check length
-        putResponse.response.payload.length.should.equal(29);
-        sleep.sleep(3);
-      });
+      // check length
+      putResponse.response.payload.length.should.equal(29);
+      sleep.sleep(3);
+    });
 
     it('should get metadata of the Object', async () => {
       const call = await ostorageService.get({
@@ -756,16 +756,17 @@ describe('testing ostorage-srv with ACS disabled', () => {
 
     it('should move objects from one bucket to another', async () => {
       let moveResponse = await ostorageService.move({
-       items: [{
-         bucket: 'test2',
-         key: 'config_new.json',
-         sourceObject: 'test/config.json'
-       }, {
-        bucket: 'test2',
-        key: 'second_config_new.json',
-        sourceObject: 'test/second_config.json'
-       }]
+        items: [{
+          bucket: 'test2',
+          key: 'config_new.json',
+          sourceObject: 'test/config.json'
+        }, {
+          bucket: 'test2',
+          key: 'second_config_new.json',
+          sourceObject: 'test/second_config.json'
+        }]
       });
+      console.log('Move Response is...', JSON.stringify(moveResponse));
       // validate moveResponse
       should.exist(moveResponse.response);
       should(moveResponse.response).length(2);

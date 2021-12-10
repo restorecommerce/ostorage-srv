@@ -8,7 +8,7 @@ import {
 } from './utils';
 import {
   Decision, AuthZAction, ACSAuthZ,
-  Subject, updateConfig, DecisionResponse
+  Subject, updateConfig, DecisionResponse, Operation
 } from '@restorecommerce/acs-client';
 import {
   Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse,
@@ -203,7 +203,7 @@ export class Service {
     }
   }
 
-  async list(call: Call<ListRequest>, context?: any): Promise<ListResponse> {
+  async list(call: Call<ListRequest>, ctx?: any): Promise<ListResponse> {
     let { bucket, filters, max_keys, prefix } = call.request;
 
     let subject = call.request.subject;
@@ -211,11 +211,12 @@ export class Service {
     let acsResponse: ReadPolicyResponse; // WhatisAllowed check for Read operation
     try {
       // target entity for ACS is bucket name here
-      Object.assign(resource, { subject });
-      acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
-        bucket, this, null, true);
+      ctx.subject = subject;
+      ctx.resources = [];
+      acsResponse = await checkAccessRequest(ctx, [{ resource: bucket }], AuthZAction.READ,
+        Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for list operation', err);
       return {
         operation_status: {
           code: err.code,
@@ -226,7 +227,7 @@ export class Service {
     if (acsResponse.decision != Decision.PERMIT) {
       return { operation_status: acsResponse.operation_status };
     }
-    const customArgs = resource.custom_arguments;
+    const customArgs = acsResponse?.custom_query_args?.custom_arguments;
     const ownerIndictaorEntURN = this.cfg.get('authorization:urns:ownerIndicatoryEntity');
     const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
     let customArgsFilter, ownerValues, ownerIndicatorEntity;
@@ -334,7 +335,7 @@ export class Service {
     return listResponse;
   }
 
-  async get(call: any, context?: any): Promise<any> {
+  async get(call: any, ctx?: any): Promise<any> {
     // get gRPC call request
     const { bucket, key, download } = call.request.request;
     let subject = call.request.request.subject;
@@ -511,14 +512,17 @@ export class Service {
         this.logger.debug('Object metadata not found');
       }
       // resource identifier is key here
-      let resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
+      let resource = { id: key, bucket, meta: metaObj, data };
       let acsResponse: DecisionResponse; // isAllowed check for Read operation
       try {
         // target entity for ACS is bucket name here
-        acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
-          bucket, this);
+        ctx.subject = subject;
+        // setting ctx resources since for read operation we make isAllowed request
+        ctx.resources = resource;
+        acsResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: key }], AuthZAction.READ,
+          Operation.isAllowed);
       } catch (err) {
-        this.logger.error('Error occurred requesting access-control-srv:', err);
+        this.logger.error('Error occurred requesting access-control-srv for get operation', err);
         await call.write({
           response: {
             payload: null,
@@ -675,7 +679,7 @@ export class Service {
     return resource;
   }
 
-  async put(call: any, callback: any): Promise<PutResponse> {
+  async put(call: any, ctx: any): Promise<PutResponse> {
     let key, bucket, meta, options, subject;
     let streamRequest = await call.getServerRequestStream();
     const readable = new Readable({ read() { } });
@@ -741,11 +745,13 @@ export class Service {
       // created meta if it was not provided in request
       let acsResponse: DecisionResponse;
       try {
+        ctx.subject = subject;
+        ctx.resources = resource;
         // target entity for ACS is bucket name here
-        acsResponse = await checkAccessRequest(subject, resource, AuthZAction.CREATE,
-          bucket, this) as DecisionResponse;
+        acsResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: key }], AuthZAction.CREATE,
+          Operation.isAllowed) as DecisionResponse;
       } catch (err) {
-        this.logger.error('Error occurred requesting access-control-srv:', err);
+        this.logger.error('Error occurred requesting access-control-srv for put operation', err);
         return {
           response: {
             payload: null,
@@ -974,7 +980,7 @@ export class Service {
               request: {
                 bucket: sourceBucketName, key: sourceKeyName, subject
               }
-            } as any);
+            } as any, context);
 
             let deleteResponseCode, deleteResponseMessage;
             if (deleteResponse && deleteResponse.status && deleteResponse.status[0]) {
@@ -1016,7 +1022,7 @@ export class Service {
     return moveResponse;
   }
 
-  async copy(call: any, callback: any): Promise<CopyResponseList> {
+  async copy(call: any, ctx: any): Promise<CopyResponseList> {
     const request = await call.request;
     let bucket: string;
     let copySource: string;
@@ -1121,14 +1127,16 @@ export class Service {
         }
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
-        let resource = { id: key, key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
+        let resource = { id: key, key, sourceBucketName, meta: metaObj, data };
         let acsResponse: DecisionResponse; // isAllowed check for Read operation
         try {
           // target entity for ACS is source bucket here
-          acsResponse = await checkAccessRequest(subject, resource, AuthZAction.READ,
-            sourceBucketName, this);
+          ctx.subject = subject;
+          ctx.resources = resource;
+          acsResponse = await checkAccessRequest(ctx, [{ resource: sourceBucketName, id: key }], AuthZAction.READ,
+            Operation.isAllowed);
         } catch (err) {
-          this.logger.error('Error occurred requesting access-control-srv:', err);
+          this.logger.error('Error occurred requesting access-control-srv for copy read', err);
           grpcResponse.response.push({
             status: {
               id: sourceKeyName,
@@ -1156,8 +1164,10 @@ export class Service {
         let sourceACL = metaObj.acl;
         metaObj.acl = meta?.acl ? meta.acl : [];
         resource.meta = metaObj;
-        let writeAccessResponse = await checkAccessRequest(subject, resource,
-          AuthZAction.CREATE, bucket, this);
+        ctx.subject = subject;
+        ctx.resources = resource;
+        let writeAccessResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: resource.key }],
+          AuthZAction.CREATE, Operation.isAllowed);
         if (writeAccessResponse.decision != Decision.PERMIT) {
           grpcResponse.response.push({
             status: {
@@ -1441,7 +1451,7 @@ export class Service {
     return (allowedCharacters.test(key));
   }
 
-  async delete(call: Call<DeleteRequest>, context?: any): Promise<DeleteResponse> {
+  async delete(call: Call<DeleteRequest>, ctx?: any): Promise<DeleteResponse> {
     const { bucket, key } = call.request;
     let subject = call.request.subject;
     if (!_.includes(this.buckets, bucket)) {
@@ -1480,13 +1490,15 @@ export class Service {
         meta_subject = JSON.parse(headObject.Metadata.subject);
       }
     }
-    Object.assign(resources, { meta: metaObj, data, subject: { id: meta_subject.id } });
+    Object.assign(resources, { meta: metaObj, data });
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
-        bucket, this);
+      ctx.subject = subject;
+      ctx.resources = resources;
+      acsResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: key }], AuthZAction.DELETE,
+        Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for delete operation:', err);
       return {
         status: [{ id: key, code: err.code, message: err.message }],
         operation_status: OPERATION_STATUS_SUCCESS
