@@ -1,3 +1,9 @@
+## 0.2.14 (December 10th, 2021)
+
+- updated acs-client (fixed GQLAccessRequest api accordingly)
+- updated logger with esTransformer for stringifying ES fields
+- updated all dependencies
+
 ## 0.2.13 (November 19th, 2021)
 
 - fix put for meta owner information
