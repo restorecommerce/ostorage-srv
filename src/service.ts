@@ -203,7 +203,7 @@ export class Service {
     }
   }
 
-  async list(call: Call<ListRequest>, ctx?: any): Promise<ListResponse> {
+  async list(call: Call<ListRequest>, ctx: any): Promise<ListResponse> {
     let { bucket, filters, max_keys, prefix } = call.request;
 
     let subject = call.request.subject;
@@ -335,7 +335,7 @@ export class Service {
     return listResponse;
   }
 
-  async get(call: any, ctx?: any): Promise<any> {
+  async get(call: any, ctx: any): Promise<any> {
     // get gRPC call request
     const { bucket, key, download } = call.request.request;
     let subject = call.request.request.subject;
@@ -1451,7 +1451,7 @@ export class Service {
     return (allowedCharacters.test(key));
   }
 
-  async delete(call: Call<DeleteRequest>, ctx?: any): Promise<DeleteResponse> {
+  async delete(call: Call<DeleteRequest>, ctx: any): Promise<DeleteResponse> {
     const { bucket, key } = call.request;
     let subject = call.request.subject;
     if (!_.includes(this.buckets, bucket)) {

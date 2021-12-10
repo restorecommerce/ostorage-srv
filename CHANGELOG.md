@@ -1,3 +1,7 @@
+## 0.2.15 (December 10th, 2021)
+
+- made ctx mandatory for exposed grpc api's (prevent errors for internal service calls)
+
 ## 0.2.14 (December 10th, 2021)
 
 - updated acs-client (fixed GQLAccessRequest api accordingly)
