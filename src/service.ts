@@ -228,7 +228,7 @@ export class Service {
       return { operation_status: acsResponse.operation_status };
     }
     let customArgs;
-    if(acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
       customArgs = acsResponse.custom_query_args[0].custom_arguments;
     }
     const ownerIndictaorEntURN = this.cfg.get('authorization:urns:ownerIndicatoryEntity');
@@ -515,7 +515,7 @@ export class Service {
         this.logger.debug('Object metadata not found');
       }
       // resource identifier is key here
-      let resource = { id: key, bucket, meta: metaObj, data };
+      let resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: DecisionResponse; // isAllowed check for Read operation
       try {
         // target entity for ACS is bucket name here
@@ -742,7 +742,7 @@ export class Service {
         };
       }
 
-      let resource = { key, bucket, meta, options };
+      let resource = { key, bucket, meta, options, subject: { id: subject.id } };
       resource = this.createMetadata(resource, subject);
       const metaWithOwner = resource.meta;
       // created meta if it was not provided in request
@@ -1465,7 +1465,7 @@ export class Service {
     }
 
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
-    let resources = { Bucket: bucket, Key: key };
+    let resources = { Bucket: bucket, Key: key, subject: { id: subject.id } };
     let headObject: any = await getHeadObject(resources, this.ossClient, this.logger);
     if (headObject && headObject.status) {
       return {

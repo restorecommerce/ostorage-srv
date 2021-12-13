@@ -1,3 +1,7 @@
+## 0.2.17 (December 13th, 2021)
+
+- fixed to add subject to context resources as it can be used in rule conditions context resources
+
 ## 0.2.16 (December 10th, 2021)
 
 - fixed custom arguments
