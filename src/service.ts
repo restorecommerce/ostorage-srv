@@ -210,6 +210,7 @@ export class Service {
     let resource: any = { bucket, filters };
     let acsResponse: PolicySetRQResponse; // WhatisAllowed check for Read operation
     try {
+      if (!ctx) { ctx = {}; };
       // target entity for ACS is bucket name here
       ctx.subject = subject;
       ctx.resources = [];
@@ -518,6 +519,7 @@ export class Service {
       let resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: DecisionResponse; // isAllowed check for Read operation
       try {
+        if (!ctx) { ctx = {}; };
         // target entity for ACS is bucket name here
         ctx.subject = subject;
         // setting ctx resources since for read operation we make isAllowed request
@@ -748,6 +750,7 @@ export class Service {
       // created meta if it was not provided in request
       let acsResponse: DecisionResponse;
       try {
+        if (!ctx) { ctx = {}; };
         ctx.subject = subject;
         ctx.resources = resource;
         // target entity for ACS is bucket name here
@@ -1133,6 +1136,7 @@ export class Service {
         let resource = { id: key, key, sourceBucketName, meta: metaObj, data };
         let acsResponse: DecisionResponse; // isAllowed check for Read operation
         try {
+          if (!ctx) { ctx = {}; };
           // target entity for ACS is source bucket here
           ctx.subject = subject;
           ctx.resources = resource;
@@ -1167,6 +1171,7 @@ export class Service {
         let sourceACL = metaObj.acl;
         metaObj.acl = meta?.acl ? meta.acl : [];
         resource.meta = metaObj;
+        if (!ctx) { ctx = {}; };
         ctx.subject = subject;
         ctx.resources = resource;
         let writeAccessResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: resource.key }],
@@ -1496,6 +1501,7 @@ export class Service {
     Object.assign(resources, { meta: metaObj, data, subject: { ud: meta_subject.id } });
     let acsResponse: DecisionResponse;
     try {
+      if (!ctx) { ctx = {}; };
       ctx.subject = subject;
       ctx.resources = resources;
       acsResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: key }], AuthZAction.DELETE,

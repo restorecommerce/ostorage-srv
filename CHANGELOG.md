@@ -1,3 +1,7 @@
+## 0.2.18 (December 13th, 2021)
+
+- added null check for context object
+
 ## 0.2.17 (December 13th, 2021)
 
 - fixed to add subject to context resources as it can be used in rule conditions context resources
