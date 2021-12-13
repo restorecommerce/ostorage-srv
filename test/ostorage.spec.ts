@@ -766,7 +766,6 @@ describe('testing ostorage-srv with ACS disabled', () => {
           sourceObject: 'test/second_config.json'
         }]
       });
-      console.log('Move Response is...', JSON.stringify(moveResponse));
       // validate moveResponse
       should.exist(moveResponse.response);
       should(moveResponse.response).length(2);

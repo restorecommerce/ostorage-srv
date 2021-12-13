@@ -1465,7 +1465,7 @@ export class Service {
     }
 
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
-    let resources = { Bucket: bucket, Key: key, subject: { id: subject.id } };
+    let resources = { Bucket: bucket, Key: key };
     let headObject: any = await getHeadObject(resources, this.ossClient, this.logger);
     if (headObject && headObject.status) {
       return {
@@ -1493,7 +1493,7 @@ export class Service {
         meta_subject = JSON.parse(headObject.Metadata.subject);
       }
     }
-    Object.assign(resources, { meta: metaObj, data });
+    Object.assign(resources, { meta: metaObj, data, subject: { ud: meta_subject.id } });
     let acsResponse: DecisionResponse;
     try {
       ctx.subject = subject;
