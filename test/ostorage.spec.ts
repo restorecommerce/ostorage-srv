@@ -1,4 +1,4 @@
-import * as should from 'should';
+import should from 'should';
 import { Worker } from '../lib/worker';
 import { GrpcClient } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';

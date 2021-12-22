@@ -1,3 +1,7 @@
+## 0.2.21 (December 22nd, 2021)
+
+- updated ts config and added no floating promises rule
+
 ## 0.2.20 (December 22nd, 2021)
 
 - updated RC dependencies

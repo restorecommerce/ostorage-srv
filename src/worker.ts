@@ -53,7 +53,7 @@ export class Worker {
     const redisClient = new Redis(redisConfig);
 
     // init ACS cache
-    initializeCache();
+    await initializeCache();
 
     // init ids-client to lookup token in case subject does not contain id
     const idsClientCfg = cfg.get('client:user');
