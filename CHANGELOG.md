@@ -1,3 +1,7 @@
+## 0.2.23 (January 12th, 2022)
+
+- fix `put` operation for ACS check, added resource id as key as it is needed for ctx resources HR scope check
+
 ## 0.2.22 (December 22nd, 2021)
 
 - removed importHelpers flag from tsconfig

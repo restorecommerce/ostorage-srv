@@ -744,7 +744,8 @@ export class Service {
         };
       }
 
-      let resource = { key, bucket, meta, options, subject: { id: subject.id } };
+      // added resource id as key - needed for ctx resources HR scope check
+      let resource = { id: key, key, bucket, meta, options, subject: { id: subject.id } };
       resource = this.createMetadata(resource, subject);
       const metaWithOwner = resource.meta;
       // created meta if it was not provided in request
