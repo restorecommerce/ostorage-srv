@@ -1504,6 +1504,9 @@ export class Service {
     try {
       if (!ctx) { ctx = {}; };
       ctx.subject = subject;
+      if(!(resources as any).id) {
+        (resources as any).id = key;
+      }
       ctx.resources = resources;
       acsResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: key }], AuthZAction.DELETE,
         Operation.isAllowed);
