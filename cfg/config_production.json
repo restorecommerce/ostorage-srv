@@ -10,7 +10,7 @@
     }
   },
   "redis": {
-    "host": "redis"
+    "url": "redis://redis:6379"
   },
   "s3": {
     "client": {
@@ -58,7 +58,7 @@
   },
   "authorization": {
     "cache":  {
-      "host": "redis"
+      "url": "redis://redis:6379"
     }
   }
 }
