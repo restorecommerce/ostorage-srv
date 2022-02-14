@@ -1,3 +1,7 @@
+## 0.2.25 (February 14th, 2022)
+
+- updated dependencies and migrated from ioredis to redis
+
 ## 0.2.24 (January 13th, 2022)
 
 - fix `delete` operation for ACS check, added resource id as key as it is needed for ctx resources HR scope check
