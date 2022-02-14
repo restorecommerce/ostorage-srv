@@ -15,7 +15,7 @@ import {
   CopyResponse, CopyResponseList, CopyObjectParams, Meta, DeleteResponse,
   ListResponse, MoveRequestList, MoveResponseList, MoveResponse
 } from './interfaces';
-import { Redis } from 'ioredis';
+import { createClient, RedisClientType } from 'redis';
 import { ListObjectsV2Request } from 'aws-sdk/clients/s3';
 
 const META_OWNER = 'meta.owner';
@@ -34,10 +34,10 @@ export class Service {
   cfg: any;
   authZCheck: boolean;
   idsService: any;
-  aclRedisClient: Redis;
+  aclRedisClient: RedisClientType<any, any>;
 
   constructor(cfg: any, private logger: any, private topics: any, authZ: ACSAuthZ,
-    idsService: any, aclRedisClient: Redis) {
+    idsService: any, aclRedisClient: RedisClientType<any, any>) {
     this.ossClient = new aws.S3(cfg.get('s3:client'));
     this.buckets = cfg.get('s3:buckets') || [];
     this.bucketsLifecycleConfigs = cfg.get('s3.bucketsLifecycleConfigs');

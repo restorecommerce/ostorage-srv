@@ -2,10 +2,10 @@ import * as chassis from '@restorecommerce/chassis-srv';
 import { Events } from '@restorecommerce/kafka-client';
 import { updateConfig } from '@restorecommerce/acs-client';
 import { Unimplemented } from '@restorecommerce/chassis-srv/lib/microservice/errors';
-import { Redis as RedisClient } from 'ioredis';
+import { RedisClientType } from 'redis';
 
 export class OStorageCommandInterface extends chassis.CommandInterface {
-  constructor(server: chassis.Server, cfg: any, logger: any, events: Events, redisClient: RedisClient) {
+  constructor(server: chassis.Server, cfg: any, logger: any, events: Events, redisClient: RedisClientType<any, any>) {
     super(server, cfg, logger, events, redisClient);
   }
 
