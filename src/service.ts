@@ -1134,7 +1134,7 @@ export class Service {
         }
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
-        let resource = { id: key, key, sourceBucketName, meta: metaObj, data };
+        let resource = { id: key, key, sourceBucketName, meta: metaObj, data,  subject: { id: meta_subject.id }  };
         let acsResponse: DecisionResponse; // isAllowed check for Read operation
         try {
           if (!ctx) { ctx = {}; };
@@ -1499,7 +1499,7 @@ export class Service {
         meta_subject = JSON.parse(headObject.Metadata.subject);
       }
     }
-    Object.assign(resources, { meta: metaObj, data, subject: { ud: meta_subject.id } });
+    Object.assign(resources, { meta: metaObj, data, subject: { id: meta_subject.id } });
     let acsResponse: DecisionResponse;
     try {
       if (!ctx) { ctx = {}; };

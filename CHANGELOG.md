@@ -1,3 +1,7 @@
+## 0.2.28 (March 25th, 2022)
+
+- fix copy operation `READ` acs request to pass subject id
+
 ## 0.2.27 (February 18th, 2022)
 
 - updated chassis-srv (includes fix for offset store config)
