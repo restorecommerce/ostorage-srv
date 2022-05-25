@@ -5,7 +5,7 @@ import { Unimplemented } from '@restorecommerce/chassis-srv/lib/microservice/err
 import { RedisClientType } from 'redis';
 
 export class OStorageCommandInterface extends chassis.CommandInterface {
-  constructor(server: chassis.Server, cfg: any, logger: any, events: Events, redisClient: RedisClientType<any, any>) {
+  constructor(server: chassis.Server, cfg: any, logger: any, events: any, redisClient: RedisClientType<any, any>) {
     super(server, cfg, logger, events, redisClient);
   }
 

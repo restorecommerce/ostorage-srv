@@ -40,7 +40,7 @@ export class Worker {
 
     // topics
     logger.verbose('Setting up topics');
-    const events = new Events(cfg.get('events:kafka'), logger);
+    const events: any = new Events(cfg.get('events:kafka'), logger);
     await events.start();
     this.offsetStore = new chassis.OffsetStore(events, cfg, logger);
 
