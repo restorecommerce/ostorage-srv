@@ -408,7 +408,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       result.operation_status.message.should.equal('success');
     });
 
-    it('should upload object with umlauts ä_ö_ü.json and validate objectUploaded event and list object and finally delete the object', async () => {
+    it('should upload object with umlauts ä_ö_ü.json and validate objectUploaded event and list object, read object, move object and finally delete the object', async () => {
       // Create an event listener for the "objectUploaded" event and when an
       // object is uploaded, consume the event and validate the fields being sent.
       const listener = function (msg: any, context: any, config: any, eventName: string): void {
@@ -424,7 +424,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       topic = await events.topic('io.restorecommerce.ostorage');
       topic.on('objectUploaded', listener);
 
-      const readStream = fs.createReadStream('./test/cfg/config.json');
+      const readStream = fs.createReadStream('./test/cfg/testObject.json');
       const transformBuffObj = () => {
         return new Transform({
           objectMode: true,
@@ -442,9 +442,12 @@ describe('testing ostorage-srv with ACS disabled', () => {
           }
         });
       };
+      // store object
       const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
       putResponse.response.payload.key.should.equal('ä_ö_ü.json');
       putResponse.response.payload.url.should.equal('//test/%C3%A4_%C3%B6_%C3%BC.json');
+
+      // list object
       let listResponse = await ostorageService.list({
         bucket: 'test'
       });
@@ -455,6 +458,44 @@ describe('testing ostorage-srv with ACS disabled', () => {
       listResponse.response[0].payload.object_name.should.equal('ä_ö_ü.json');
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
+
+      // read object
+      const call = await ostorageService.get({
+        key: 'ä_ö_ü.json',
+        bucket: 'test'
+      });
+      call.on('data', (data) => {
+        if (data?.response?.payload) {
+          should.exist(data.response.payload.key);
+          data.response.payload.key.should.equal('ä_ö_ü.json');
+          should.exist(data.response.payload.bucket);
+          data.response.payload.bucket.should.equal('test');
+          should.exist(data.response.payload.url);
+          data.response.payload.url.should.equal('//test/ä_ö_ü.json');
+          should.exist(data.response.payload.object);
+          const objectValue = JSON.parse(data.response.payload.object.toString()).testKey;
+          should.exist(objectValue);
+          objectValue.should.equal('testValue');
+          meta.owner.should.deepEqual(data.response.payload.meta.owner);
+        } else {
+          // emitted on end event with no payload
+          should.exist(data.operation_status);
+          data.operation_status.code.should.equal(200);
+          data.operation_status.message.should.equal('success');
+        }
+      });
+
+      await new Promise((resolve, reject) => {
+        call.on('end', async () => {
+          await topic.removeListener('objectDownloadRequested', listener);
+          resolve(0);
+        });
+      });
+      sleep.sleep(3);
+
+      // move object
+
+      // delete object
       let delResponse = await ostorageService.delete({
         bucket: 'test',
         key: 'ä_ö_ü.json'
