@@ -825,12 +825,7 @@ export class Service {
       // so we create a copy of the metaData object in unstringified state
       if (meta && meta.acl && !_.isEmpty(meta.acl)) {
         // store meta acl to redis
-        // encode key if it contains since this is put
-        if (this.keyContainsSpecialCharacters(key)) {
-          await this.aclRedisClient.set(`${bucket}:${encodeURIComponent(key)}`, JSON.stringify(meta.acl));
-        } else {
-          await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
-        }
+        await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
         delete meta.acl;
       }
 
@@ -914,7 +909,7 @@ export class Service {
         }
         // instead of bucket and key use the result to construct the URL if it exists
         let bucketWithKey;
-        if(result?.Location) {
+        if (result?.Location) {
           const uploadedUrl = result?.Location;
           bucketWithKey = uploadedUrl?.substring(uploadedUrl?.indexOf(bucket));
         }
@@ -1127,7 +1122,7 @@ export class Service {
         }
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
-        let resource = { id: key, key, sourceBucketName, meta: metaObj, data,  subject: { id: meta_subject.id }  };
+        let resource = { id: key, key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
         let acsResponse: DecisionResponse; // isAllowed check for Read operation
         try {
           if (!ctx) { ctx = {}; };
@@ -1277,6 +1272,9 @@ export class Service {
           // 4. Copy object with new metadata
           try {
             copyObjectResult = await new Promise((resolve, reject) => {
+              if (this.keyContainsSpecialCharacters(params.CopySource)) {
+                params.CopySource = encodeURIComponent(params.CopySource);
+              }
               this.ossClient.copyObject(params, async (err: any, data) => {
                 if (err) {
                   this.logger.error('Error occurred while copying object:',
@@ -1397,6 +1395,9 @@ export class Service {
           // 4. Copy object with new metadata
           try {
             copyObjectResult = await new Promise((resolve, reject) => {
+              if (this.keyContainsSpecialCharacters(params.CopySource)) {
+                params.CopySource = encodeURIComponent(params.CopySource);
+              }
               this.ossClient.copyObject(params, async (err: any, data) => {
                 if (err) {
                   this.logger.error('Error occurred while copying object:',
@@ -1499,7 +1500,7 @@ export class Service {
     try {
       if (!ctx) { ctx = {}; };
       ctx.subject = subject;
-      if(!(resources as any).id) {
+      if (!(resources as any).id) {
         (resources as any).id = key;
       }
       ctx.resources = resources;

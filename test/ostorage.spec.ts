@@ -493,14 +493,47 @@ describe('testing ostorage-srv with ACS disabled', () => {
       });
       sleep.sleep(3);
 
-      // move object
-
-      // delete object
-      let delResponse = await ostorageService.delete({
-        bucket: 'test',
-        key: 'ä_ö_ü.json'
+      // move object - ä_ö_ü.json to moved.json
+      let moveResponse = await ostorageService.move({
+        items: [{
+          bucket: 'test2',
+          key: 'moved.json',
+          sourceObject: 'test/ä_ö_ü.json'
+        }]
       });
-      delResponse.status[0].id.should.equal('ä_ö_ü.json');
+      // validate moveResponse
+      should.exist(moveResponse.response);
+      should(moveResponse.response).length(1);
+      should.exist(moveResponse.response[0].payload);
+      should.exist(moveResponse.response[0].status.code);
+      moveResponse.response[0].status.code.should.equal(200);
+
+      // validate test bucket response should be empty
+      listResponse = await ostorageService.list({
+        bucket: 'test',
+      });
+      should(listResponse.response).empty;
+      listResponse.operation_status.code.should.equal(200);
+
+      // validate test2 bucket response should contain 2 objects
+      let listResponse2 = await ostorageService.list({
+        bucket: 'test2',
+      });
+      should.exist(listResponse2);
+      should.exist(listResponse2.response);
+      should.exist(listResponse2.response[0].payload);
+      listResponse2.response[0].payload.url.should.equal('//test2/moved.json');
+      should(listResponse2.response).length(1);
+      listResponse2.operation_status.code.should.equal(200);
+      listResponse2.operation_status.message.should.equal('success');
+      sleep.sleep(3);
+
+      // delete object moved.json from test2 bucket
+      let delResponse = await ostorageService.delete({
+        bucket: 'test2',
+        key: 'moved.json'
+      });
+      delResponse.status[0].id.should.equal('moved.json');
       delResponse.status[0].code.should.equal(200);
       sleep.sleep(3);
     });
