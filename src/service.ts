@@ -1060,8 +1060,7 @@ export class Service {
           copySourceStr = copySource.slice(1, copySource.length);
         }
         const sourceBucketName = copySourceStr.substring(0, copySourceStr.indexOf('/'));
-        const sourceKeyName = copySourceStr.substr(copySourceStr.indexOf('/'), copySourceStr.length);
-
+        const sourceKeyName = copySourceStr.substring(copySourceStr.indexOf('/'), copySourceStr.length);
         // Start - Compose the copyObject params
         let params: CopyObjectParams = {
           Bucket: bucket,

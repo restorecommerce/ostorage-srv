@@ -1,3 +1,8 @@
+## 0.2.29 (May 25th, 2022)
+
+- fix to support special characters in key name (such as umlauts and removed the key from s3 meta data)
+- updated dependencies
+
 ## 0.2.28 (March 25th, 2022)
 
 - fix copy operation `READ` acs request to pass subject id
