@@ -864,7 +864,7 @@ export class Service {
       if (!options) {
         options = {};
       }
-      const result = await new Promise((resolve, reject) => {
+      const result: any = await new Promise((resolve, reject) => {
         this.ossClient.upload({
           Key: key,
           Bucket: bucket,
@@ -912,8 +912,13 @@ export class Service {
           };
           this.topics['ostorage'].emit('objectUploaded', objectUploadedPayload);
         }
-        // TODO instead of bucket and key use the result to construct the URL
-        const url = `//${bucket}/${key}`;
+        // instead of bucket and key use the result to construct the URL if it exists
+        let bucketWithKey;
+        if(result?.Location) {
+          const uploadedUrl = result?.Location;
+          bucketWithKey = uploadedUrl?.substring(uploadedUrl?.indexOf(bucket));
+        }
+        let url = bucketWithKey ? `//${bucketWithKey}` : `//${bucket}/${key}`;
         const tags = options && options.tags;
         return {
           response: {
@@ -1219,7 +1224,7 @@ export class Service {
             await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(sourceACL));
           }
           params.Metadata = {
-            meta: JSON.stringify(meta), // TODO remove it and store to redis ?
+            meta: JSON.stringify(meta),
             subject: JSON.stringify({ id: subject.id })
           };
           // override data if it is provided
@@ -1328,7 +1333,7 @@ export class Service {
           }
           params.Metadata = {
             data: JSON.stringify(data),
-            meta: JSON.stringify(meta), // TODO remove it and store to redis ?
+            meta: JSON.stringify(meta),
             subject: JSON.stringify({ id: subject.id })
           };
 

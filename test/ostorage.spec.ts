@@ -408,34 +408,61 @@ describe('testing ostorage-srv with ACS disabled', () => {
       result.operation_status.message.should.equal('success');
     });
 
-    // it('Should return an error if an invalid object name is used when storing object', async () => {
-    //   const readStream = fs.createReadStream('./test/cfg/testObject.json');
-    //   const transformBuffObj = () => {
-    //     return new Transform({
-    //       objectMode: true,
-    //       transform: (chunk, _, done) => {
-    //         // object buffer
-    //         const data = {
-    //           bucket: 'test',
-    //           key: 'config{}.json',
-    //           object: chunk,
-    //           meta,
-    //           options,
-    //           subject: {}
-    //         };
-    //         done(null, data);
-    //       }
-    //     });
-    //   };
-    //   const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
-    //   should(putResponse.response.payload).null;
-    //   putResponse.response.status.id.should.equal('config{}.json');
-    //   putResponse.response.status.code.should.equal(400);
-    //   putResponse.response.status.message.should.equal('Invalid Object name config{}.json');
-    //   putResponse.operation_status.code.should.equal(200);
-    //   putResponse.operation_status.message.should.equal('success');
-    //   sleep.sleep(3);
-    // });
+    it('should upload object with umlauts ä_ö_ü.json and validate objectUploaded event and list object and finally delete the object', async () => {
+      // Create an event listener for the "objectUploaded" event and when an
+      // object is uploaded, consume the event and validate the fields being sent.
+      const listener = function (msg: any, context: any, config: any, eventName: string): void {
+        if (eventName == 'objectUploaded') {
+          const key = msg.key;
+          const bucket = msg.bucket;
+          should.exist(key);
+          should.exist(bucket);
+          // key.should.equal('second_config.json');
+          bucket.should.equal('test');
+        }
+      };
+      topic = await events.topic('io.restorecommerce.ostorage');
+      topic.on('objectUploaded', listener);
+
+      const readStream = fs.createReadStream('./test/cfg/config.json');
+      const transformBuffObj = () => {
+        return new Transform({
+          objectMode: true,
+          transform: (chunk, _, done) => {
+            // object buffer
+            const data = {
+              bucket: 'test',
+              key: 'ä_ö_ü.json',
+              object: chunk,
+              meta,
+              options,
+              subject: { scope: 'orgC' }
+            };
+            done(null, data);
+          }
+        });
+      };
+      const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
+      putResponse.response.payload.key.should.equal('ä_ö_ü.json');
+      putResponse.response.payload.url.should.equal('//test/%C3%A4_%C3%B6_%C3%BC.json');
+      let listResponse = await ostorageService.list({
+        bucket: 'test'
+      });
+      should.exist(listResponse);
+      should.exist(listResponse.response);
+      should.exist(listResponse.response[0].payload);
+      should(listResponse.response).length(1);
+      listResponse.response[0].payload.object_name.should.equal('ä_ö_ü.json');
+      listResponse.operation_status.code.should.equal(200);
+      listResponse.operation_status.message.should.equal('success');
+      let delResponse = await ostorageService.delete({
+        bucket: 'test',
+        key: 'ä_ö_ü.json'
+      });
+      delResponse.status[0].id.should.equal('ä_ö_ü.json');
+      delResponse.status[0].code.should.equal(200);
+      sleep.sleep(3);
+    });
 
     it('Should store the data to storage server using request streaming', async () => {
       const readStream = fs.createReadStream('./test/cfg/testObject.json');
