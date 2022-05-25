@@ -207,7 +207,6 @@ export class Service {
     let { bucket, filters, max_keys, prefix } = call.request;
 
     let subject = call.request.subject;
-    let resource: any = { bucket, filters };
     let acsResponse: PolicySetRQResponse; // WhatisAllowed check for Read operation
     try {
       if (!ctx) { ctx = {}; };
@@ -293,9 +292,8 @@ export class Service {
                 operation_status: { code: meta.status.code, message: meta.status.message }
               };
             }
-            const metaKey = meta?.Metadata?.key;
-            const url = `//${bucket}/${metaKey}`;
-            const objectName = metaKey;
+            const url = `//${bucket}/${eachObj.Key}`;
+            const objectName = eachObj.Key;
             let objectMeta;
             if (meta && meta.Metadata && meta.Metadata.meta) {
               objectMeta = JSON.parse(meta.Metadata.meta);
@@ -716,20 +714,6 @@ export class Service {
           });
         }
       });
-      // validate object name and bucket
-      if (!this.IsValidObjectName(key)) {
-        return {
-          response: {
-            payload: null,
-            status: {
-              id: key,
-              code: 400,
-              message: `Invalid Object name ${key}`
-            }
-          },
-          operation_status: OPERATION_STATUS_SUCCESS
-        };
-      }
       if (!_.includes(this.buckets, bucket)) {
         return {
           response: {
@@ -833,8 +817,7 @@ export class Service {
       let metaDataCopy = {
         meta,
         data,
-        subject,
-        key,
+        subject
       };
       // Only Key Value pairs where the Values must be strings can be stored
       // inside the object metadata in S3, reason why we stringify the value fields.
@@ -842,15 +825,19 @@ export class Service {
       // so we create a copy of the metaData object in unstringified state
       if (meta && meta.acl && !_.isEmpty(meta.acl)) {
         // store meta acl to redis
-        await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
+        // encode key if it contains since this is put
+        if (this.keyContainsSpecialCharacters(key)) {
+          await this.aclRedisClient.set(`${bucket}:${encodeURIComponent(key)}`, JSON.stringify(meta.acl));
+        } else {
+          await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
+        }
         delete meta.acl;
       }
 
       let metaData = {
         meta: JSON.stringify(meta),
         data: JSON.stringify(data),
-        subject: JSON.stringify(subject),
-        key,
+        subject: JSON.stringify(subject)
       };
 
       // get object length
@@ -925,6 +912,7 @@ export class Service {
           };
           this.topics['ostorage'].emit('objectUploaded', objectUploadedPayload);
         }
+        // TODO instead of bucket and key use the result to construct the URL
         const url = `//${bucket}/${key}`;
         const tags = options && options.tags;
         return {
@@ -1232,7 +1220,6 @@ export class Service {
           }
           params.Metadata = {
             meta: JSON.stringify(meta), // TODO remove it and store to redis ?
-            key,
             subject: JSON.stringify({ id: subject.id })
           };
           // override data if it is provided
@@ -1342,7 +1329,6 @@ export class Service {
           params.Metadata = {
             data: JSON.stringify(data),
             meta: JSON.stringify(meta), // TODO remove it and store to redis ?
-            key,
             subject: JSON.stringify({ id: subject.id })
           };
 
@@ -1455,9 +1441,13 @@ export class Service {
   // Regular expression that checks if the filename string contains
   // only characters described as safe to use in the Amazon S3
   // Object Key Naming Guidelines
-  private IsValidObjectName(key: string): boolean {
+  private keyContainsSpecialCharacters(key: string): boolean {
     const allowedCharacters = new RegExp('^[a-zA-Z0-9-!_.*\'()@/]+$');
-    return (allowedCharacters.test(key));
+    if (allowedCharacters.test(key) === true) {
+      return false;
+    } else {
+      return true;
+    }
   }
 
   async delete(call: Call<DeleteRequest>, ctx: any): Promise<DeleteResponse> {

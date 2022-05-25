@@ -408,34 +408,34 @@ describe('testing ostorage-srv with ACS disabled', () => {
       result.operation_status.message.should.equal('success');
     });
 
-    it('Should return an error if an invalid object name is used when storing object', async () => {
-      const readStream = fs.createReadStream('./test/cfg/testObject.json');
-      const transformBuffObj = () => {
-        return new Transform({
-          objectMode: true,
-          transform: (chunk, _, done) => {
-            // object buffer
-            const data = {
-              bucket: 'test',
-              key: 'config{}.json',
-              object: chunk,
-              meta,
-              options,
-              subject: {}
-            };
-            done(null, data);
-          }
-        });
-      };
-      const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
-      should(putResponse.response.payload).null;
-      putResponse.response.status.id.should.equal('config{}.json');
-      putResponse.response.status.code.should.equal(400);
-      putResponse.response.status.message.should.equal('Invalid Object name config{}.json');
-      putResponse.operation_status.code.should.equal(200);
-      putResponse.operation_status.message.should.equal('success');
-      sleep.sleep(3);
-    });
+    // it('Should return an error if an invalid object name is used when storing object', async () => {
+    //   const readStream = fs.createReadStream('./test/cfg/testObject.json');
+    //   const transformBuffObj = () => {
+    //     return new Transform({
+    //       objectMode: true,
+    //       transform: (chunk, _, done) => {
+    //         // object buffer
+    //         const data = {
+    //           bucket: 'test',
+    //           key: 'config{}.json',
+    //           object: chunk,
+    //           meta,
+    //           options,
+    //           subject: {}
+    //         };
+    //         done(null, data);
+    //       }
+    //     });
+    //   };
+    //   const putResponse = await ostorageService.put(readStream.pipe(transformBuffObj()));
+    //   should(putResponse.response.payload).null;
+    //   putResponse.response.status.id.should.equal('config{}.json');
+    //   putResponse.response.status.code.should.equal(400);
+    //   putResponse.response.status.message.should.equal('Invalid Object name config{}.json');
+    //   putResponse.operation_status.code.should.equal(200);
+    //   putResponse.operation_status.message.should.equal('success');
+    //   sleep.sleep(3);
+    // });
 
     it('Should store the data to storage server using request streaming', async () => {
       const readStream = fs.createReadStream('./test/cfg/testObject.json');
