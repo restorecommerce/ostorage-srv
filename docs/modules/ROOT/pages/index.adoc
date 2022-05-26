@@ -9,10 +9,10 @@ A microservice for object storage  part of the link:https://github.com/restoreco
 [#features]
 == Features
 
-* Abstracting object storage through https://grpc.io/docs/[gRPC].
-* It uses an https://www.npmjs.com/package/aws-sdk[AWS SDK] client for connecting to an object storage framework.
-* This service can be used with an Object Storage Server compatible with the S3 API and this can be configured in
-link:https://github.com/restorecommerce/ostorage-srv/blob/master/cfg/config.json[config.json].
+* Smart facade for S3 object storage exposed via https://grpc.io/docs/[gRPC].
+* It uses the https://www.npmjs.com/package/aws-sdk[AWS SDK] client for connecting to S3 compatible stores.
+* Built in access control enforement based on the https://github.com/restorecommerce/access-control-srv[ACS].
+* Overcomes limitation of metadata in S3 by allowing to store meta data in redis.
 
 [#configuration]
 == Configuration
