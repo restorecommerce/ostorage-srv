@@ -5,7 +5,7 @@ import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Service } from './service';
 import { OStorageCommandInterface } from './commandInterface';
-import { createClient } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import { Logger } from 'winston';
 import { GrpcClient } from '@restorecommerce/grpc-client';
@@ -50,7 +50,7 @@ export class Worker {
     // init redisClient
     const redisConfig = cfg.get('redis');
     redisConfig.database = cfg.get('redis:db-indexes:db-subject');
-    const redisClient = createClient(redisConfig);
+    const redisClient: RedisClientType<any, any> = createClient(redisConfig);
     redisClient.on('error', (err) => logger.error('Redis client error in subject store', err));
     await redisClient.connect();
 
@@ -85,7 +85,7 @@ export class Worker {
     }
 
     redisConfig.database = cfg.get('redis:db-indexes:db-aclStore');
-    const aclRedisClient = createClient(redisConfig);
+    const aclRedisClient: RedisClientType<any, any> = createClient(redisConfig);
     aclRedisClient.on('error', (err) => logger.error('Redis client error in ACL store', err));
     await aclRedisClient.connect();
     const oss = new Service(cfg, logger, this.topics, this.authZ, idsService,
