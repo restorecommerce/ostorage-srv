@@ -1,8 +1,8 @@
 = Object Storage Service
 
-https://travis-ci.org/restorecommerce/ostorage-srv?branch=master[image:http://img.shields.io/travis/restorecommerce/ostorage-srv/master.svg?style=flat-square[Build Status]]
-https://david-dm.org/restorecommerce/ostorage-srv[image:https://img.shields.io/david/restorecommerce/ostorage-srv.svg?style=flat-square[Dependencies]]
-https://coveralls.io/github/restorecommerce/ostorage-srv?branch=master[image:http://img.shields.io/coveralls/restorecommerce/ostorage-srv/master.svg?style=flat-square[Cover]]
+https://travis-ci.org/restorecommerce/ostorage-srv?branch=master[image:https://img.shields.io/travis/restorecommerce/ostorage-srv/master.svg?style=flat-square[Build Status]]
+https://depfu.com/repos/github/restorecommerce/ostorage-srv?branch=master[image:https://img.shields.io/depfu/dependencies/github/restorecommerce/ostorage-srv?style=flat-square[Dependencies]]
+https://coveralls.io/github/restorecommerce/ostorage-srv?branch=master[image:https://img.shields.io/coveralls/github/restorecommerce/ostorage-srv/master.svg?style=flat-square[Coverage Status]]
 
 A microservice for object storage.
 
