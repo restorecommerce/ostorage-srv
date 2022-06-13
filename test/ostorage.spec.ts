@@ -5,7 +5,10 @@ import { Events, Topic } from '@restorecommerce/kafka-client';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import * as sleep from 'sleep';
 import * as fs from 'fs';
-import { startGrpcMockServer, bucketPolicySetRQ, stopGrpcMockServer, permitCreateObjRule, denyCreateObjRule } from './utils';
+import { bucketPolicySetRQ, permitCreateObjRule } from './utils';
+import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
+import * as proto_loader from '@grpc/proto-loader';
+import * as grpc from '@grpc/grpc-js';
 import { unmarshallProtobufAny } from "../lib/utils";
 import { Transform } from 'stream';
 import * as _ from 'lodash';
@@ -53,6 +56,76 @@ let meta = {
   }]
 };
 
+interface MethodWithOutput {
+  method: string,
+  output: any
+};
+
+const PROTO_PATH: string = 'node_modules/@restorecommerce/protos/io/restorecommerce/access_control.proto';
+const PKG_NAME: string = 'io.restorecommerce.access_control';
+const SERVICE_NAME: string = 'Service';
+
+const pkgDef: grpc.GrpcObject = grpc.loadPackageDefinition(
+  proto_loader.loadSync(PROTO_PATH, {
+    includeDirs: ['node_modules/@restorecommerce/protos'],
+    keepCase: true,
+    longs: String,
+    enums: String,
+    defaults: true,
+    oneofs: true
+  })
+);
+
+const proto: any = ProtoUtils.getProtoFromPkgDefinition(
+  PKG_NAME,
+  pkgDef
+);
+
+const mockServer = new GrpcMockServer('localhost:50061');
+
+const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
+  // create mock implementation based on the method name and output
+  const implementations = {
+    isAllowed: (call: any, callback: any) => {
+      if (call?.request?.context?.resources[0]?.value) {
+        let ctxResources = JSON.parse(call.request.context.resources[0].value.toString());
+        if (ctxResources?.id === 'config_invalid_scope' || call?.request?.target?.subject[0]?.value.startsWith('invalid_subject_id')) {
+          callback(null, { decision: 'DENY' });
+        } else {
+          const isAllowedResponse = methodWithOutput.filter(e => e.method === 'IsAllowed');
+          const response: any = new proto.Response.constructor(isAllowedResponse[0].output);
+          callback(null, response);
+        }
+      }
+    },
+    whatIsAllowed: (call: any, callback: any) => {
+      // check the request object and provide UserPolicies / RolePolicies
+      const whatIsAllowedResponse = methodWithOutput.filter(e => e.method === 'WhatIsAllowed');
+      const response: any = new proto.ReverseQuery.constructor(whatIsAllowedResponse[0].output);
+      callback(null, response);
+    }
+  };
+  try {
+    mockServer.addService(PROTO_PATH, PKG_NAME, SERVICE_NAME, implementations, {
+      includeDirs: ['node_modules/@restorecommerce/protos/'],
+      keepCase: true,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true
+    });
+    await mockServer.start();
+    logger.info('Mock ACS Server started on port 50061');
+  } catch (err) {
+    logger.error('Error starting mock ACS server', err);
+  }
+};
+
+const stopGrpcMockServer = async () => {
+  await mockServer.stop();
+  logger.info('Mock ACS Server closed successfully');
+};
+
 async function start(): Promise<void> {
   cfg = createServiceConfig(process.cwd() + '/test');
   worker = new Worker(cfg);
@@ -89,7 +162,6 @@ describe('testing ostorage-srv with ACS enabled', () => {
 
   after(async function stopServer(): Promise<void> {
     await stop();
-    stopGrpcMockServer(mockServer, logger);
   });
   let subject;
   // mainOrg -> orgA -> orgB -> orgC
@@ -132,8 +204,8 @@ describe('testing ostorage-srv with ACS enabled', () => {
       // PERMIT mock
       bucketPolicySetRQ.policy_sets[0].policies[0].rules = [permitCreateObjRule];
       bucketPolicySetRQ.policy_sets[0].policies[0].effect = 'PERMIT';
-      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
-      { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }], logger);
+      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', output: bucketPolicySetRQ },
+      { method: 'IsAllowed', output: { decision: 'PERMIT' } }]);
       subject = acsSubject;
       const readStream = fs.createReadStream('./test/cfg/testObject.json');
 
@@ -203,13 +275,6 @@ describe('testing ostorage-srv with ACS enabled', () => {
       result.response.length.should.equal(1);
     });
     it('With invalid subject scope should throw an error when storing object', async () => {
-      // stop and restart acs mock service for DENY
-      await stopGrpcMockServer(mockServer, logger);
-      // DENY mock
-      bucketPolicySetRQ.policy_sets[0].policies[0].rules = [denyCreateObjRule];
-      bucketPolicySetRQ.policy_sets[0].policies[0].effect = 'PERMIT';
-      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
-      { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'DENY' } }], logger);
       subject = acsSubject;
       subject.scope = 'orgD'; // set scope to invalid value which does not exist in user HR scope
       subject.id = 'invalid_user_scope_id';
@@ -329,12 +394,6 @@ describe('testing ostorage-srv with ACS enabled', () => {
     it('With valid scope should replace the object', async () => {
       subject.id = 'admin_user_id';
       subject.scope = 'orgC'; // setting valid subject scope
-      await stopGrpcMockServer(mockServer, logger);
-      // PERMIT mock
-      bucketPolicySetRQ.policy_sets[0].policies[0].rules = [permitCreateObjRule];
-      bucketPolicySetRQ.policy_sets[0].policies[0].effect = 'PERMIT';
-      mockServer = await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: bucketPolicySetRQ },
-      { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }], logger);
       const data = {
         items: [{
           bucket: 'test',
@@ -383,7 +442,7 @@ describe('testing ostorage-srv with ACS enabled', () => {
       });
       should(result.error).null;
       should(result.data).empty;
-      await stopGrpcMockServer(mockServer, logger);
+      await stopGrpcMockServer();
     });
   });
 });
