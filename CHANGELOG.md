@@ -1,3 +1,7 @@
+## 0.3.0 (June 30th, 2022)
+
+- up deps
+
 ## 0.2.29 (May 25th, 2022)
 
 - fix to support special characters in key name (such as umlauts and removed the key from s3 meta data)
