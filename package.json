@@ -33,7 +33,7 @@
     "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "@alenon/grpc-mock-server": "^3.0.8",
+    "@alenon/grpc-mock-server": "^3.0.9",
     "@grpc/proto-loader": "^0.6.13",
     "@types/lodash": "^4.14.182",
     "@types/mocha": "^9.1.1",
