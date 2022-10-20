@@ -33,7 +33,7 @@ const OPERATION_STATUS_SUCCESS = {
   message: 'success'
 };
 
-export class Service implements OStorageServiceServiceImplementation {
+export class Service {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
   buckets: string[];
   bucketsLifecycleConfigs?: any;
@@ -344,7 +344,7 @@ export class Service implements OStorageServiceServiceImplementation {
     return listResponse;
   }
 
-  async get(request: any, ctx: any): Promise<any> {
+  async get(request: any, ctx: any): Promise<ServerStreamingMethodResult<DeepPartial<ObjectResponse>>> {
     // get gRPC call request
     const { bucket, key, download } = request;
     let subject = request.subject;
