@@ -1,14 +1,17 @@
 import {
-  AuthZAction, Decision, PolicySetRQResponse, accessRequest, Subject,
+  AuthZAction, PolicySetRQResponse, accessRequest,
   DecisionResponse, Operation
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { createLogger } from '@restorecommerce/logger';
-import { GrpcClient } from '@restorecommerce/grpc-client';
+import { createChannel, createClient } from '@restorecommerce/grpc-client';
+import { ServiceDefinition as UserServiceDefinition, ServiceClient as UserServiceClient } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import { errors } from '@restorecommerce/chassis-srv';
 import { HeadObjectParams } from './interfaces';
 import { S3 } from 'aws-sdk';
+import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 
 export interface HierarchicalScope {
   id: string;
@@ -33,7 +36,7 @@ export interface FilterType {
 }
 
 // Create a ids client instance
-let idsClientInstance;
+let idsClientInstance: UserServiceClient;
 const getUserServiceClient = async () => {
   if (!idsClientInstance) {
     const cfg = createServiceConfig(process.cwd());
@@ -46,8 +49,10 @@ const getUserServiceClient = async () => {
     };
     const logger = createLogger(loggerCfg);
     if (grpcIDSConfig) {
-      const idsClient = new GrpcClient(grpcIDSConfig, logger);
-      idsClientInstance = idsClient.user;
+      idsClientInstance = createClient({
+        ...grpcIDSConfig,
+        logger
+      }, UserServiceDefinition, createChannel(grpcIDSConfig.address));
     }
   }
   return idsClientInstance;
@@ -111,7 +116,7 @@ export async function checkAccessRequest(ctx: GQLClientContext, resource: Resour
     result = await accessRequest(subject, resource, action, ctx, operation);
   } catch (err) {
     return {
-      decision: Decision.DENY,
+      decision: Response_Decision.DENY,
       obligation: [],
       operation_status: {
         code: err.code || 500,

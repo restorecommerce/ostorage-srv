@@ -20,6 +20,11 @@
       "level": "crit",
       "colorize": true,
       "prettyPrint": true
+    },
+    "fieldOptions": {
+      "omitFields": [
+        "custom_arguments", "metadata"
+      ]
     }
   },
   "redis": {
@@ -42,94 +47,40 @@
       },
       "latestOffset": false,
       "restoreCommand": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
       "restoreResponse": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "healthCheckCommand": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
       "healthCheckResponse": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "versionCommand": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
       "versionResponse": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "resetCommand": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
       "resetResponse": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "renderRequest": {
-        "protos": [
-          "io/restorecommerce/rendering.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.rendering.RenderRequest"
       },
       "renderResponse": {
-        "protos": [
-          "io/restorecommerce/rendering.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.rendering.RenderResponse"
       },
       "objectUploaded": {
-        "protos": [
-          "io/restorecommerce/ostorage.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.ostorage.OstorageMessage",
-        "omittedFields": [
-          "metadata"
-        ]
+        "messageObject": "io.restorecommerce.ostorage.OstorageMessage"
       },
       "objectDownloadRequested": {
-        "protos": [
-          "io/restorecommerce/ostorage.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.ostorage.OstorageMessage",
-        "omittedFields": [
-          "metadata"
-        ]
+        "messageObject": "io.restorecommerce.ostorage.OstorageMessage"
       },
       "topics": {
         "ostorage": {
@@ -159,83 +110,10 @@
     "ownerIndicatoryInstance": "urn:restorecommerce:acs:names:ownerInstance"
   },
   "server": {
-    "services": {
-      "io-restorecommerce-ostorage-srv": {
-        "put": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        },
-        "get": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        },
-        "delete": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        },
-        "list": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        },
-        "copy": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        },
-        "move":{
-          "transport": [
-            "grpcOstorage"
-          ]
-        }
-      },
-      "io-restorecommerce-ostorage-reflection": {
-        "serverReflectionInfo": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        }
-      },
-      "io-restorecommerce-ostorage-cis": {
-        "command": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        }
-      },
-      "grpc-health-v1": {
-        "check": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        },
-        "watch": {
-          "transport": [
-            "grpcOstorage"
-          ]
-        }
-      }
-    },
     "transports": [
       {
         "name": "grpcOstorage",
         "provider": "grpc",
-        "services": {
-          "io-restorecommerce-ostorage-srv": "io.restorecommerce.ostorage.Service",
-          "io-restorecommerce-ostorage-reflection": "grpc.reflection.v1alpha.ServerReflection",
-          "io-restorecommerce-ostorage-cis": "io.restorecommerce.commandinterface.Service",
-          "grpc-health-v1": "grpc.health.v1.Health"
-        },
-        "protos": [
-          "io/restorecommerce/ostorage.proto",
-          "grpc/reflection/v1alpha/reflection.proto",
-          "io/restorecommerce/commandinterface.proto",
-          "grpc/health/v1/health.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "addr": "localhost:50066"
       }
     ]
@@ -290,49 +168,13 @@
   },
   "client": {
     "acs-srv": {
-      "address": "localhost:50061",
-      "proto": {
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "protoPath": "io/restorecommerce/access_control.proto",
-        "services": {
-          "acs-srv": {
-            "packageName": "io.restorecommerce.access_control",
-            "serviceName": "Service"
-          }
-        }
-      }
+      "address": "localhost:50061"
     },
     "user": {
-      "address": "localhost:50051",
-      "proto": {
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "protoPath": "io/restorecommerce/user.proto",
-        "services": {
-          "user": {
-            "packageName": "io.restorecommerce.user",
-            "serviceName": "Service"
-          }
-        }
-      },
-      "omittedFields": {
-        "ReadRequest": "custom_arguments"
-      }
+      "address": "localhost:50051"
     },
     "ostorage": {
-      "address": "localhost:50066",
-      "proto": {
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "protoPath": "io/restorecommerce/ostorage.proto",
-        "services": {
-          "ostorage": {
-            "packageName": "io.restorecommerce.ostorage",
-            "serviceName": "Service"
-          }
-        }
-      },
-      "omittedFields": {
-        "ReadRequest": "custom_arguments"
-      }
+      "address": "localhost:50066"
     }
   }
 }

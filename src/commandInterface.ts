@@ -1,5 +1,4 @@
 import * as chassis from '@restorecommerce/chassis-srv';
-import { Events } from '@restorecommerce/kafka-client';
 import { updateConfig } from '@restorecommerce/acs-client';
 import { Unimplemented } from '@restorecommerce/chassis-srv/lib/microservice/errors';
 import { RedisClientType } from 'redis';

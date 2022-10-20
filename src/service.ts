@@ -7,16 +7,23 @@ import {
   marshallProtobufAny, getHeadObject
 } from './utils';
 import {
-  Decision, AuthZAction, ACSAuthZ, PolicySetRQResponse,
-  Subject, updateConfig, DecisionResponse, Operation
+  AuthZAction, ACSAuthZ, PolicySetRQResponse,
+  updateConfig, DecisionResponse, Operation
 } from '@restorecommerce/acs-client';
-import {
-  Attribute, Options, ListRequest, DeleteRequest, Call, PutResponse,
-  CopyResponse, CopyResponseList, CopyObjectParams, Meta, DeleteResponse,
-  ListResponse, MoveRequestList, MoveResponseList, MoveResponse
-} from './interfaces';
-import { createClient, RedisClientType } from 'redis';
+import { CopyObjectParams } from './interfaces';
+import { RedisClientType } from 'redis';
 import { ListObjectsV2Request } from 'aws-sdk/clients/s3';
+import {
+  ServiceServiceImplementation as OStorageServiceServiceImplementation,
+  ServerStreamingMethodResult, DeepPartial, ObjectResponse, ListRequest,
+  ListResponse, GetRequest, Options, PutResponse, MoveRequestList,
+  MoveResponseList, CopyResponseList, CopyRequestList, CopyResponseItem, DeleteRequest
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
+import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/attribute';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
+import { DeleteResponse } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 
 const META_OWNER = 'meta.owner';
 const EQ = 'eq';
@@ -26,7 +33,7 @@ const OPERATION_STATUS_SUCCESS = {
   message: 'success'
 };
 
-export class Service {
+export class Service implements OStorageServiceServiceImplementation {
   ossClient: aws.S3; // object storage frameworks are S3-compatible
   buckets: string[];
   bucketsLifecycleConfigs?: any;
@@ -203,10 +210,10 @@ export class Service {
     }
   }
 
-  async list(call: Call<ListRequest>, ctx: any): Promise<ListResponse> {
-    let { bucket, filters, max_keys, prefix } = call.request;
+  async list(request: ListRequest, ctx: any): Promise<DeepPartial<ListResponse>> {
+    let { bucket, filters, max_keys, prefix } = request;
 
-    let subject = call.request.subject;
+    let subject = request.subject;
     let acsResponse: PolicySetRQResponse; // WhatisAllowed check for Read operation
     try {
       if (!ctx) { ctx = {}; };
@@ -224,7 +231,7 @@ export class Service {
         }
       };
     }
-    if (acsResponse.decision != Decision.PERMIT) {
+    if (acsResponse.decision != Response_Decision.PERMIT) {
       return { operation_status: acsResponse.operation_status };
     }
     let customArgs;
@@ -337,16 +344,16 @@ export class Service {
     return listResponse;
   }
 
-  async get(call: any, ctx: any): Promise<any> {
+  async get(request: any, ctx: any): Promise<any> {
     // get gRPC call request
-    const { bucket, key, download } = call.request.request;
-    let subject = call.request.request.subject;
+    const { bucket, key, download } = request;
+    let subject = request.subject;
     if (!subject) {
-      subject = {};
+      subject = { id: '', scope: '', token: '', unauthenticated: undefined };
     }
 
     if (!_.includes(this.buckets, bucket)) {
-      await call.write({
+      await request.write({
         response: {
           payload: null,
           status: {
@@ -357,10 +364,10 @@ export class Service {
         },
         operation_status: OPERATION_STATUS_SUCCESS
       });
-      return await call.end();
+      return await request.end();
     }
     if (!key) {
-      await call.write({
+      await request.write({
         response: {
           payload: null,
           status: {
@@ -371,14 +378,14 @@ export class Service {
         },
         operation_status: OPERATION_STATUS_SUCCESS
       });
-      return await call.end();
+      return await request.end();
     }
 
     // get metadata of the object stored in the S3 object storage
     const params = { Bucket: bucket, Key: key };
     let headObject: any = await getHeadObject(params, this.ossClient, this.logger);
     if (headObject.status) {
-      await call.write({
+      await request.write({
         response: {
           payload: null,
           status: {
@@ -389,7 +396,7 @@ export class Service {
         },
         operation_status: OPERATION_STATUS_SUCCESS
       });
-      return await call.end();
+      return await request.end();
     }
 
     // get object tagging of the object stored in the S3 object storage
@@ -415,7 +422,7 @@ export class Service {
       });
     } catch (err) {
       this.logger.info('No object tagging found for key:', { Key: key });
-      await call.write({
+      await request.write({
         response: {
           payload: null,
           status: {
@@ -426,7 +433,7 @@ export class Service {
         },
         operation_status: OPERATION_STATUS_SUCCESS
       });
-      return await call.end();
+      return await request.end();
     }
     // capture meta data from response message
     let metaObj;
@@ -480,7 +487,7 @@ export class Service {
         }
       }
       let tags: Attribute[] = [];
-      let tagObj: Attribute;
+      let tagObj;
       if (objectTagging) {
         // transform received object to respect our own defined structure
         let receivedTags = objectTagging.TagSet;
@@ -526,7 +533,7 @@ export class Service {
           Operation.isAllowed);
       } catch (err) {
         this.logger.error('Error occurred requesting access-control-srv for get operation', err);
-        await call.write({
+        await request.write({
           response: {
             payload: null,
             status: {
@@ -537,10 +544,10 @@ export class Service {
           },
           operation_status: OPERATION_STATUS_SUCCESS
         });
-        return await call.end();
+        return await request.end();
       }
-      if (acsResponse.decision != Decision.PERMIT) {
-        await call.write({
+      if (acsResponse.decision != Response_Decision.PERMIT) {
+        await request.write({
           response: {
             payload: null,
             status: {
@@ -551,7 +558,7 @@ export class Service {
           },
           operation_status: OPERATION_STATUS_SUCCESS
         });
-        return await call.end();
+        return await request.end();
       }
 
       this.logger.info(`Received a request to get object ${key} on bucket ${bucket}`);
@@ -574,7 +581,7 @@ export class Service {
       };
 
       downloadable.on('end', async () => {
-        await call.write({
+        await request.write({
           response: {
             payload: null,
             status: {
@@ -591,7 +598,7 @@ export class Service {
       downloadable.on('error', async (err) => {
         this.logger.error('Error reading Object from Server', { error: err.message });
         const code = (err as any).code || 500;
-        await call.write({
+        await request.write({
           response: {
             payload: null,
             status: {
@@ -602,15 +609,15 @@ export class Service {
           },
           operation_status: OPERATION_STATUS_SUCCESS
         });
-        return await call.end();
+        return await request.end();
       });
       // Pipe through passthrough transformation stream
       try {
-        downloadable.pipe(transformBufferToGrpcObj()).pipe(call.request);
+        downloadable.pipe(transformBufferToGrpcObj()).pipe(request);
       } catch (err) {
         this.logger.error('Error piping streamable response', { err: err.messsage });
         const code = (err as any).code || 500;
-        await call.write({
+        await request.write({
           response: {
             payload: null,
             status: {
@@ -621,7 +628,7 @@ export class Service {
           },
           operation_status: OPERATION_STATUS_SUCCESS
         });
-        return await call.end();
+        return await request.end();
       }
       // emit objectDownloadRequested event
       // collect all metadata
@@ -682,19 +689,18 @@ export class Service {
     return resource;
   }
 
-  async put(call: any, ctx: any): Promise<PutResponse> {
+  async put(request: any, ctx: any): Promise<DeepPartial<PutResponse>> {
     let key, bucket, meta, options, subject;
-    let streamRequest = await call.getServerRequestStream();
     const readable = new Readable({ read() { } });
 
-    streamRequest.on('data', (data) => {
+    request.on('data', (data) => {
       // add stream of data into a readable stream
       if (data.object) {
         readable.push(data.object);
       }
     });
 
-    streamRequest.on('end', () => {
+    request.on('end', () => {
       // end of readable stream
       readable.push(null);
     });
@@ -704,7 +710,7 @@ export class Service {
       // pause till first chunk is received to make ACS request
       await new Promise((resolve: any, reject) => {
         if (!bucket || !key) {
-          streamRequest.on('data', (data) => {
+          request.on('data', (data) => {
             bucket = data.bucket;
             key = data.key;
             options = data.options;
@@ -755,7 +761,7 @@ export class Service {
           operation_status: OPERATION_STATUS_SUCCESS
         };
       }
-      if (acsResponse.decision != Decision.PERMIT) {
+      if (acsResponse.decision != Response_Decision.PERMIT) {
         return {
           response: {
             payload: null,
@@ -845,7 +851,7 @@ export class Service {
       let tagId: string, tagVal: string;
       if (options && options.tags) {
         let tags = options.tags;
-        for (const [i, v] of tags.entries()) {
+        for (const [i, v] of (tags as any).entries()) {
           tagId = v.id;
           tagVal = v.value;
           if (i < tags.length - 1) {
@@ -857,7 +863,7 @@ export class Service {
       }
       // write headers to the S3 object
       if (!options) {
-        options = {};
+        options = { encoding: '', content_type: '', length: 0, content_disposition: '', version: '', content_language: '', md5: '', tags: [] };
       }
       const result: any = await new Promise((resolve, reject) => {
         this.ossClient.upload({
@@ -940,8 +946,8 @@ export class Service {
     }
   }
 
-  async move(call: Call<MoveRequestList>, context?: any): Promise<MoveResponseList> {
-    let { items, subject } = call.request;
+  async move(request: MoveRequestList, context?: any): Promise<DeepPartial<MoveResponseList>> {
+    let { items, subject } = request;
     let moveResponse: MoveResponseList = {
       response: [],
       operation_status: { code: 0, message: '' }
@@ -964,7 +970,7 @@ export class Service {
         sourceKeyName = copySourceStr.substr(copySourceStr.indexOf('/'), copySourceStr.length);
       }
       // No need for ACS check as both Read and Create access check are made in Copy operation
-      const copyResponse = await this.copy({ request: { items: [item], subject } }, context);
+      const copyResponse = await this.copy({ items: [item as any], subject }, context);
       // if copyResponse is success for each of the object then delete the sourceObject
       if (copyResponse?.operation_status?.code === 200) {
         for (let response of copyResponse.response) {
@@ -990,7 +996,11 @@ export class Service {
               }
               moveResponse.response.push({
                 payload: (response.payload as any),
-                status: deleteResponse.status[0]
+                status: {
+                  id: payload.key,
+                  code: deleteResponse.status[0].code,
+                  message: deleteResponse.status[0].message
+                }
               });
             } else {
               // fail status
@@ -1005,20 +1015,23 @@ export class Service {
           } else {
             // fail status
             moveResponse.response.push({
-              status: response.status
+              status: {
+                id: response.status.id,
+                code: response.status.code,
+                message: response.status.message
+              }
             });
           }
         }
       } else {
-        moveResponse.operation_status = copyResponse.operation_status;
+        moveResponse.operation_status = { code: copyResponse.operation_status.code, message: copyResponse.operation_status.message };
       }
     }
     moveResponse.operation_status = { code: 200, message: 'success' };
     return moveResponse;
   }
 
-  async copy(call: any, ctx: any): Promise<CopyResponseList> {
-    const request = await call.request;
+  async copy(request: CopyRequestList, ctx: any): Promise<DeepPartial<CopyResponseList>> {
     let bucket: string;
     let copySource: string;
     let key: string;
@@ -1026,7 +1039,7 @@ export class Service {
     let options: Options;
     let grpcResponse: CopyResponseList = { response: [], operation_status: { code: 0, message: '' } };
     let copyObjectResult;
-    let subject = call.request.subject;
+    let subject = request.subject;
     let destinationSubjectScope; // scope for destination bucket
     if (subject && subject.scope) {
       destinationSubjectScope = subject.scope;
@@ -1106,7 +1119,7 @@ export class Service {
           }
         }
         if (!subject) {
-          subject = {};
+          subject = { id: '', unauthenticated: undefined, scope: '', token: '' };
         }
         if (metaObj && metaObj.owner && metaObj.owner.length > 0) {
           let metaOwnerVal;
@@ -1141,7 +1154,7 @@ export class Service {
           });
           continue;
         }
-        if (acsResponse.decision != Decision.PERMIT) {
+        if (acsResponse.decision != Response_Decision.PERMIT) {
           grpcResponse.response.push({
             status: {
               id: sourceKeyName,
@@ -1164,7 +1177,7 @@ export class Service {
         ctx.resources = resource;
         let writeAccessResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: resource.key }],
           AuthZAction.CREATE, Operation.isAllowed);
-        if (writeAccessResponse.decision != Decision.PERMIT) {
+        if (writeAccessResponse.decision != Response_Decision.PERMIT) {
           grpcResponse.response.push({
             status: {
               id: key,
@@ -1202,11 +1215,13 @@ export class Service {
             const urns = this.cfg.get('authorization:urns');
             meta.owner = [{
               id: urns.ownerIndicatoryEntity,
-              value: urns.organization
+              value: urns.organization,
+              attribute: []
             },
             {
               id: urns.ownerInstance,
-              value: destinationSubjectScope
+              value: destinationSubjectScope,
+              attribute: []
             }];
           }
           if (meta && meta.acl && !_.isEmpty(meta.acl)) {
@@ -1252,7 +1267,7 @@ export class Service {
           let tagId: string, tagVal: string;
           if (!_.isEmpty(options.tags)) {
             const tagsList = options.tags;
-            for (const [i, v] of tagsList.entries()) {
+            for (const [i, v] of (tagsList as any).entries()) {
               tagId = v.id;
               tagVal = v.value;
               if (i < options.tags.length - 1) {
@@ -1313,11 +1328,13 @@ export class Service {
             const urns = this.cfg.get('authorization:urns');
             meta.owner = [{
               id: urns.ownerIndicatoryEntity,
-              value: urns.organization
+              value: urns.organization,
+              attribute: []
             },
             {
               id: urns.ownerInstance,
-              value: destinationSubjectScope
+              value: destinationSubjectScope,
+              attribute: []
             }];
           }
           if (meta && meta.acl && !_.isEmpty(meta.acl)) {
@@ -1426,7 +1443,7 @@ export class Service {
         }
 
         if (copyObjectResult) {
-          let copiedObject: CopyResponse = {
+          let copiedObject: CopyResponseItem = {
             bucket,
             copySource,
             key,
@@ -1455,9 +1472,9 @@ export class Service {
     }
   }
 
-  async delete(call: Call<DeleteRequest>, ctx: any): Promise<DeleteResponse> {
-    const { bucket, key } = call.request;
-    let subject = call.request.subject;
+  async delete(request: DeleteRequest, ctx: any): Promise<DeepPartial<DeleteResponse>> {
+    const { bucket, key } = request;
+    let subject = request.subject;
     if (!_.includes(this.buckets, bucket)) {
       return {
         status: [{ id: key, code: 400, message: `Invalid bucket name ${bucket}` }],
@@ -1512,7 +1529,7 @@ export class Service {
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }
-    if (acsResponse.decision != Decision.PERMIT) {
+    if (acsResponse.decision != Response_Decision.PERMIT) {
       return {
         status: [{ id: key, code: acsResponse.operation_status.code, message: acsResponse.operation_status.message }],
         operation_status: OPERATION_STATUS_SUCCESS

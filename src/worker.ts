@@ -1,6 +1,6 @@
 import { createServiceConfig } from '@restorecommerce/service-config';
 import * as _ from 'lodash';
-import { Events } from '@restorecommerce/kafka-client';
+import { Events, registerProtoMeta, Topic } from '@restorecommerce/kafka-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Service } from './service';
@@ -8,14 +8,30 @@ import { OStorageCommandInterface } from './commandInterface';
 import { createClient, RedisClientType } from 'redis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import { Logger } from 'winston';
-import { GrpcClient } from '@restorecommerce/grpc-client';
+import { createChannel, createClient as createGrpcClient } from '@restorecommerce/grpc-client';
+import { ServiceDefinition as OStorageServiceDefinition, protoMetadata as ostorageMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
+import { ServiceDefinition as CommandInterfaceServiceDefinition, protoMetadata as commandInterfaceMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface';
+import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health';
+import {
+  protoMetadata as reflectionMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/reflection/v1alpha/reflection';
+import { ServerReflectionService } from 'nice-grpc-server-reflection';
+import { ServiceClient as UserServiceClient, ServiceDefinition as UserServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc';
+
+// register for kafka events
+registerProtoMeta(ostorageMeta, commandInterfaceMeta, reflectionMeta);
+
+interface Topics {
+  [key: string]: Topic;
+}
 
 export class Worker {
   events: Events;
   server: any;
   logger: Logger;
   cfg: any;
-  topics: any;
+  topics: Topics;
   offsetStore: chassis.OffsetStore;
   authZ: ACSAuthZ;
   oss: Service;
@@ -59,8 +75,13 @@ export class Worker {
 
     // init ids-client to lookup token in case subject does not contain id
     const idsClientCfg = cfg.get('client:user');
-    const idsClient = new GrpcClient(idsClientCfg, logger);
-    const idsService = idsClient.user;
+    let idsService: UserServiceClient;
+    if (idsClientCfg) {
+      idsService = createGrpcClient({
+        ...idsClientCfg,
+        logger
+      }, UserServiceDefinition, createChannel(idsClientCfg.address));
+    }
 
     const cis = new OStorageCommandInterface(server, cfg, logger, events, redisClient);
 
@@ -94,21 +115,34 @@ export class Worker {
 
     // list of service names
     const serviceNamesCfg = cfg.get('serviceNames');
-    await server.bind(serviceNamesCfg.ostorage, oss);
-    await server.bind(serviceNamesCfg.cis, cis);
+    await server.bind(serviceNamesCfg.ostorage, {
+      service: OStorageServiceDefinition,
+      implementation: oss
+    } as any);
+    await server.bind(serviceNamesCfg.cis, {
+      service: CommandInterfaceServiceDefinition,
+      implementation: cis
+    } as BindConfig<CommandInterfaceServiceDefinition>);
 
     // Add reflection service
     const reflectionServiceName = serviceNamesCfg.reflection;
-    const transportName = cfg.get(`server:services:${reflectionServiceName}:serverReflectionInfo:transport:0`);
-    const transport = server.transport[transportName];
-    const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
-    await server.bind(reflectionServiceName, reflectionService);
+    const reflectionService = chassis.buildReflectionService([
+      { descriptor: ostorageMeta.fileDescriptor },
+      { descriptor: commandInterfaceMeta.fileDescriptor }
+    ]);
+    await server.bind(reflectionServiceName, {
+      service: ServerReflectionService,
+      implementation: reflectionService
+    });
 
-    await server.bind(serviceNamesCfg.health, new chassis.Health(cis, {
-      logger,
-      cfg,
-      dependencies: ['acs-srv'],
-    }));
+    await server.bind(serviceNamesCfg.health, {
+      implementation: new chassis.Health(cis, {
+        logger,
+        cfg,
+        dependencies: ['acs-srv'],
+      }),
+      service: HealthDefinition
+    } as BindConfig<HealthDefinition>);
 
     // Start server
     await oss.start();
@@ -116,6 +150,7 @@ export class Worker {
 
     this.events = events;
     this.server = server;
+    this.logger.info('Ostorage service started successfully');
   }
 
   async stop(): Promise<any> {
