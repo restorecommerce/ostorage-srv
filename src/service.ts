@@ -15,7 +15,7 @@ import { RedisClientType } from 'redis';
 import { ListObjectsV2Request } from 'aws-sdk/clients/s3';
 import {
   ServiceServiceImplementation as OStorageServiceServiceImplementation,
-  ServerStreamingMethodResult, DeepPartial, ObjectResponse, ListRequest,
+  ServerStreamingMethodResult, DeepPartial, Object as PutObject, ObjectResponse, ListRequest,
   ListResponse, GetRequest, Options, PutResponse, MoveRequestList,
   MoveResponseList, CopyResponseList, CopyRequestList, CopyResponseItem, DeleteRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
@@ -344,7 +344,7 @@ export class Service {
     return listResponse;
   }
 
-  async get(request: any, ctx: any): Promise<ServerStreamingMethodResult<DeepPartial<ObjectResponse>>> {
+  async* get(request: any, ctx: any): any {
     // get gRPC call request
     const { bucket, key, download } = request;
     let subject = request.subject;
@@ -581,7 +581,8 @@ export class Service {
       };
 
       downloadable.on('end', async () => {
-        await request.write({
+        this.logger.debug('S3 read stream ended');
+        return {
           response: {
             payload: null,
             status: {
@@ -591,8 +592,7 @@ export class Service {
             }
           },
           operation_status: OPERATION_STATUS_SUCCESS
-        });
-        this.logger.debug('S3 read stream ended');
+        };
       });
 
       downloadable.on('error', async (err) => {
@@ -617,7 +617,7 @@ export class Service {
       } catch (err) {
         this.logger.error('Error piping streamable response', { err: err.messsage });
         const code = (err as any).code || 500;
-        await request.write({
+        yield {
           response: {
             payload: null,
             status: {
@@ -627,8 +627,7 @@ export class Service {
             }
           },
           operation_status: OPERATION_STATUS_SUCCESS
-        });
-        return await request.end();
+        };
       }
       // emit objectDownloadRequested event
       // collect all metadata
@@ -689,37 +688,21 @@ export class Service {
     return resource;
   }
 
-  async put(request: any, ctx: any): Promise<DeepPartial<PutResponse>> {
+  async put(request: AsyncIterable<PutObject>, ctx: any): Promise<DeepPartial<PutResponse>> {
     let key, bucket, meta, options, subject;
     const readable = new Readable({ read() { } });
-
-    request.on('data', (data) => {
-      // add stream of data into a readable stream
-      if (data.object) {
-        readable.push(data.object);
+    for await (const item of request) {
+      readable.push(item.object);
+      if (!bucket || !key) {
+        bucket = item.bucket;
+        key = item.key;
+        options = item.options;
+        subject = item.subject;
+        meta = item.meta;
       }
-    });
-
-    request.on('end', () => {
-      // end of readable stream
-      readable.push(null);
-    });
-
-
+    }
+    readable.push(null);
     try {
-      // pause till first chunk is received to make ACS request
-      await new Promise((resolve: any, reject) => {
-        if (!bucket || !key) {
-          request.on('data', (data) => {
-            bucket = data.bucket;
-            key = data.key;
-            options = data.options;
-            subject = data.subject;
-            meta = data.meta;
-            resolve();
-          });
-        }
-      });
       if (!_.includes(this.buckets, bucket)) {
         return {
           response: {
