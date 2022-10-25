@@ -24,6 +24,7 @@ import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-serve
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
 import { DeleteResponse } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 
 const META_OWNER = 'meta.owner';
 const EQ = 'eq';
@@ -344,7 +345,7 @@ export class Service {
     return listResponse;
   }
 
-  async* get(request: any, ctx: any): any {
+  async* get(request: GetRequest, ctx: any): ServerStreamingMethodResult<DeepPartial<ObjectResponse>> {
     // get gRPC call request
     const { bucket, key, download } = request;
     let subject = request.subject;
@@ -353,7 +354,7 @@ export class Service {
     }
 
     if (!_.includes(this.buckets, bucket)) {
-      await request.write({
+      yield {
         response: {
           payload: null,
           status: {
@@ -363,11 +364,11 @@ export class Service {
           }
         },
         operation_status: OPERATION_STATUS_SUCCESS
-      });
-      return await request.end();
+      };
+      return;
     }
     if (!key) {
-      await request.write({
+      yield {
         response: {
           payload: null,
           status: {
@@ -377,15 +378,15 @@ export class Service {
           }
         },
         operation_status: OPERATION_STATUS_SUCCESS
-      });
-      return await request.end();
+      };
+      return;
     }
 
     // get metadata of the object stored in the S3 object storage
     const params = { Bucket: bucket, Key: key };
     let headObject: any = await getHeadObject(params, this.ossClient, this.logger);
     if (headObject.status) {
-      await request.write({
+      yield {
         response: {
           payload: null,
           status: {
@@ -395,8 +396,8 @@ export class Service {
           }
         },
         operation_status: OPERATION_STATUS_SUCCESS
-      });
-      return await request.end();
+      };
+      return;
     }
 
     // get object tagging of the object stored in the S3 object storage
@@ -422,7 +423,7 @@ export class Service {
       });
     } catch (err) {
       this.logger.info('No object tagging found for key:', { Key: key });
-      await request.write({
+      yield {
         response: {
           payload: null,
           status: {
@@ -432,8 +433,8 @@ export class Service {
           }
         },
         operation_status: OPERATION_STATUS_SUCCESS
-      });
-      return await request.end();
+      };
+      return;
     }
     // capture meta data from response message
     let metaObj;
@@ -533,7 +534,7 @@ export class Service {
           Operation.isAllowed);
       } catch (err) {
         this.logger.error('Error occurred requesting access-control-srv for get operation', err);
-        await request.write({
+        yield {
           response: {
             payload: null,
             status: {
@@ -543,11 +544,11 @@ export class Service {
             }
           },
           operation_status: OPERATION_STATUS_SUCCESS
-        });
-        return await request.end();
+        };
+        return;
       }
       if (acsResponse.decision != Response_Decision.PERMIT) {
-        await request.write({
+        yield {
           response: {
             payload: null,
             status: {
@@ -557,8 +558,8 @@ export class Service {
             }
           },
           operation_status: OPERATION_STATUS_SUCCESS
-        });
-        return await request.end();
+        };
+        return;
       }
 
       this.logger.info(`Received a request to get object ${key} on bucket ${bucket}`);
@@ -566,54 +567,14 @@ export class Service {
       // retrieve object from Amazon S3
       // and create stream from it
       const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
-
-      const transformBufferToGrpcObj = () => {
-        return new Transform({
-          objectMode: true,
-          transform: (data, _, done) => {
-            done(null, {
-              response: {
-                payload: { bucket, key, object: data, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj }
-              },
-            });
-          }
-        });
-      };
-
-      downloadable.on('end', async () => {
-        this.logger.debug('S3 read stream ended');
-        return {
-          response: {
-            payload: null,
-            status: {
-              id: key,
-              code: 200,
-              message: 'success'
-            }
-          },
-          operation_status: OPERATION_STATUS_SUCCESS
-        };
-      });
-
-      downloadable.on('error', async (err) => {
-        this.logger.error('Error reading Object from Server', { error: err.message });
-        const code = (err as any).code || 500;
-        await request.write({
-          response: {
-            payload: null,
-            status: {
-              id: key,
-              code,
-              message: err.message
-            }
-          },
-          operation_status: OPERATION_STATUS_SUCCESS
-        });
-        return await request.end();
-      });
-      // Pipe through passthrough transformation stream
       try {
-        downloadable.pipe(transformBufferToGrpcObj()).pipe(request);
+        for await (const chunk of downloadable) {
+          yield {
+            response: {
+              payload: { bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj }
+            }
+          };
+        }
       } catch (err) {
         this.logger.error('Error piping streamable response', { err: err.messsage });
         const code = (err as any).code || 500;
@@ -629,6 +590,7 @@ export class Service {
           operation_status: OPERATION_STATUS_SUCCESS
         };
       }
+      this.logger.debug(`S3 read stream ended and Object ${key} download from ${bucket} bucket successful`);
       // emit objectDownloadRequested event
       // collect all metadata
       let allMetadata = {
@@ -640,8 +602,10 @@ export class Service {
 
       if (this.topics && this.topics['ostorage']) {
         // update downloader subject scope from findByToken with default_scope
-        const dbSubject = await this.idsService.findByToken({ token: subject.token });
-        subject.scope = dbSubject?.payload?.default_scope;
+        if (subject && subject.token) {
+          const dbSubject = await this.idsService.findByToken({ token: subject.token });
+          subject.scope = dbSubject?.payload?.default_scope;
+        }
         const objectDownloadRequestPayload = {
           key,
           bucket,
@@ -650,7 +614,6 @@ export class Service {
         };
         this.topics['ostorage'].emit('objectDownloadRequested', objectDownloadRequestPayload);
       }
-
       return;
     }
   }
@@ -961,11 +924,8 @@ export class Service {
             // delete sourceObject Object
             const payload = response.payload;
             const deleteResponse = await this.delete({
-              request: {
-                bucket: sourceBucketName, key: sourceKeyName, subject
-              }
+              bucket: sourceBucketName, key: sourceKeyName, subject
             } as any, context);
-
             let deleteResponseCode, deleteResponseMessage;
             if (deleteResponse && deleteResponse.status && deleteResponse.status[0]) {
               deleteResponseCode = deleteResponse.status[0].code;

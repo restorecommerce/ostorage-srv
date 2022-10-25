@@ -32,7 +32,10 @@
     "port": 6379,
     "offsetStoreInterval": 1000,
     "db-indexes": {
-      "db-offsetStore": 0
+      "db-offsetStore": 0,
+      "db-subject": 4,
+      "db-findByToken": 5,
+      "db-aclStore": 9
     }
   },
   "events": {
