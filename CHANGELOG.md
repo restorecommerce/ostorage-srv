@@ -1,3 +1,8 @@
+## 0.3.3 (October 27th, 2022)
+
+- migrate to fully typed client and server
+- up deps
+
 ## 0.3.2 (July 8th, 2022)
 
 - up deps
