@@ -1,9 +1,9 @@
 {
   "s3": {
     "client": {
-      "accessKeyId": "accessKey",
-      "secretAccessKey": "secretKey",
-      "endpoint": "http://127.0.0.1:9000",
+      "accessKeyId": "accessKey1",
+      "secretAccessKey": "verySecretKey1",
+      "endpoint": "http://127.0.0.1:8000",
       "s3ForcePathStyle": true
     },
     "buckets": [

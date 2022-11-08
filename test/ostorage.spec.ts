@@ -452,7 +452,7 @@ describe('testing ostorage-srv with ACS enabled', () => {
       const result = await ostorageService.copy(data);
 
       should.exist(result.response);
-      result.response[0].status.id.should.equal('/config_acs_enabled.json');
+      result.response[0].status.id.should.equal('config_acs_enabled.json');
       result.response[0].status.code.should.equal(403);
       result.response[0].status.message.should.equal('Access not allowed for request with subject:invalid_subject_id_4, resource:test, action:READ, target_scope:orgC; the response was DENY');
       sleep.sleep(3);
@@ -838,7 +838,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
         bucket: 'invalid_bucket'
       });
       should(result.response).length(0);
-      result.operation_status.message.should.equal('The specified bucket does not exist');
+      result.operation_status.message.should.equal('The specified bucket is not valid.');
       sleep.sleep(3);
     });
 
