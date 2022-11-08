@@ -45,7 +45,7 @@
       "kafka": {
         "clientId": "restore-ostorage-srv-test",
         "brokers": [
-          "localhost:29092"
+          "localhost:9092"
         ]
       },
       "latestOffset": false,
