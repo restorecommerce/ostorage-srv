@@ -14,7 +14,7 @@
   },
   "s3": {
     "client": {
-      "endpoint": "http://minio:9000"
+      "endpoint": "http://cloudserver:8000"
     }
   },
   "events": {

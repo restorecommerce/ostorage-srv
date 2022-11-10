@@ -1,3 +1,7 @@
+## 0.3.5 (November 11th, 2022)
+
+- fix OSS prod config
+
 ## 0.3.4 (November 11th, 2022)
 
 - migrate storage server from minio to zenko cloud server
