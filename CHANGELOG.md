@@ -1,3 +1,7 @@
+## 0.3.4 (November 11th, 2022)
+
+- migrate storage server from minio to zenko cloud server
+
 ## 0.3.3 (October 27th, 2022)
 
 - migrate to fully typed client and server
