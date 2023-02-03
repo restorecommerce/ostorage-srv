@@ -1112,7 +1112,12 @@ export class Service {
         subject.scope = destinationSubjectScope;
         // target entity for ACS is destination bucket here
         // For Create ACS check use the meta ACL as passed from the subject
-        let sourceACL = metaObj.acl;
+        if (metaObj == undefined){
+          metaObj = {acl: {}};
+        } else if (metaObj?.acl == undefined){
+          metaObj = {acl: {}};
+        }
+        let sourceACL = metaObj?.acl;
         metaObj.acl = meta?.acl ? meta.acl : [];
         resource.meta = metaObj;
         if (!ctx) { ctx = {}; };
