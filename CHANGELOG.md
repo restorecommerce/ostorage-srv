@@ -1,3 +1,7 @@
+## 0.3.6 (February 3rd, 2023)
+
+- fix error reading `acl`
+
 ## 0.3.5 (November 11th, 2022)
 
 - fix OSS prod config
