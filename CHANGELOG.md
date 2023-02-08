@@ -1,3 +1,7 @@
+## 0.3.2-1 (February 8th, 2023)
+
+- fix error reading `acl`
+
 ## 0.3.2 (July 8th, 2022)
 
 - up deps
