@@ -1,10 +1,6 @@
-# syntax = docker/dockerfile:experimental
-
 ### Base
-FROM node:18.2.0-alpine as base
+FROM node:18.14.0-alpine as base
 ENV NO_UPDATE_NOTIFIER=true
-RUN npm install -g npm
-RUN npm install -g typescript@3.4.1
 
 RUN apk add g++ make python3
 RUN apk add --no-cache git
