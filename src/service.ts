@@ -961,7 +961,7 @@ export class Service {
           copySourceStr = copySource.slice(1, copySource.length);
         }
         sourceBucketName = copySourceStr.substring(0, copySourceStr.indexOf('/'));
-        sourceKeyName = copySourceStr.substr(copySourceStr.indexOf('/'), copySourceStr.length);
+        sourceKeyName = copySourceStr.substr(copySourceStr.indexOf('/') + 1, copySourceStr.length);
       }
       // No need for ACS check as both Read and Create access check are made in Copy operation
       const copyResponse = await this.copy({ request: { items: [item], subject } }, context);
@@ -1060,7 +1060,7 @@ export class Service {
           copySourceStr = copySource.slice(1, copySource.length);
         }
         const sourceBucketName = copySourceStr.substring(0, copySourceStr.indexOf('/'));
-        const sourceKeyName = copySourceStr.substring(copySourceStr.indexOf('/'), copySourceStr.length);
+        const sourceKeyName = copySourceStr.substring(copySourceStr.indexOf('/') + 1, copySourceStr.length);
         // Start - Compose the copyObject params
         let params: CopyObjectParams = {
           Bucket: bucket,

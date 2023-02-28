@@ -1,3 +1,7 @@
+## 0.3.2-2 (February 28th, 2023)
+
+- fix copy and move operation to remove leading front slash in key name (cloudserver headObject lookup fails if leading frontslash is present in key name unlike minio)
+
 ## 0.3.2-1 (February 8th, 2023)
 
 - fix error reading `acl`
