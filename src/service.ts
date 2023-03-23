@@ -297,6 +297,10 @@ export class Service {
             let objectMeta;
             if (meta && meta.Metadata && meta.Metadata.meta) {
               objectMeta = JSON.parse(meta.Metadata.meta);
+              if (meta.LastModified && objectMeta) {
+                this.logger.debug('List api LastModified', { lastModified: meta?.LastModified });
+                objectMeta.modified = new Date(meta.LastModified).getTime();
+              }
             }
             let object = { object_name: objectName, url, meta: objectMeta };
             // authorization filter check
@@ -432,8 +436,9 @@ export class Service {
     let metaObj;
     let data = {};
     let meta_subject = { id: '' };
-    if (headObject && headObject.Metadata) {
-      if (headObject.Metadata.meta) {
+    // headObject.LastModified -> will give you lastModified field add this to meta in response
+    if (headObject?.Metadata) {
+      if (headObject?.Metadata?.meta) {
         metaObj = JSON.parse(headObject.Metadata.meta);
         // restore ACL from redis into metaObj
         const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
@@ -441,10 +446,10 @@ export class Service {
           metaObj.acl = JSON.parse(acl);
         }
       }
-      if (headObject.Metadata.data) {
+      if (headObject?.Metadata?.data) {
         data = JSON.parse(headObject.Metadata.data);
       }
-      if (headObject.Metadata.subject) {
+      if (headObject?.Metadata?.subject) {
         meta_subject = JSON.parse(headObject.Metadata.subject);
       }
     }
@@ -559,6 +564,11 @@ export class Service {
       // retrieve object from Amazon S3
       // and create stream from it
       const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
+
+      if (headObject?.LastModified && metaObj) {
+        this.logger.debug('GET api LastModified', { lastModified: headObject?.LastModified });
+        metaObj.modified = new Date(headObject.LastModified).getTime();
+      }
 
       const transformBufferToGrpcObj = () => {
         return new Transform({
@@ -732,6 +742,9 @@ export class Service {
       let resource = { id: key, key, bucket, meta, options, subject: { id: subject.id } };
       resource = this.createMetadata(resource, subject);
       const metaWithOwner = resource.meta;
+      if (metaWithOwner) {
+        metaWithOwner.modified = new Date().getTime();
+      }
       // created meta if it was not provided in request
       let acsResponse: DecisionResponse;
       try {
@@ -1070,6 +1083,10 @@ export class Service {
 
         const headObjectParams = { Bucket: sourceBucketName, Key: sourceKeyName };
         let headObject: any = await getHeadObject(headObjectParams, this.ossClient, this.logger);
+        if (headObject?.LastModified) {
+          this.logger.debug('Copy api last modified', { lastModified: headObject?.LastModified });
+          meta.modified = new Date(headObject?.LastModified).getTime();
+        }
         if (headObject && headObject.status) {
           grpcResponse.response.push({
             status: {

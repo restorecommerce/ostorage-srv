@@ -1,3 +1,7 @@
+## 0.3.2-3 (March 23rd, 2023)
+
+- added last modified field to meta modified for list, get and copy operations
+
 ## 0.3.2-2 (February 28th, 2023)
 
 - fix copy and move operation to remove leading front slash in key name (cloudserver headObject lookup fails if leading frontslash is present in key name unlike minio)
