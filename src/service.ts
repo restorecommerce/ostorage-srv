@@ -356,7 +356,7 @@ export class Service {
     if (!subject) {
       subject = { id: '', scope: '', token: '', unauthenticated: undefined };
     }
-
+    this.logger.info(`Received a request to get object ${key} on bucket ${bucket}`);
     if (!_.includes(this.buckets, bucket)) {
       yield {
         response: {
@@ -567,8 +567,6 @@ export class Service {
         return;
       }
 
-      this.logger.info(`Received a request to get object ${key} on bucket ${bucket}`);
-
       // retrieve object from Amazon S3
       // and create stream from it
       const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
@@ -599,7 +597,7 @@ export class Service {
           operation_status: OPERATION_STATUS_SUCCESS
         };
       }
-      this.logger.debug(`S3 read stream ended and Object ${key} download from ${bucket} bucket successful`);
+      this.logger.info(`S3 read stream ended and Object ${key} download from ${bucket} bucket successful`);
       // emit objectDownloadRequested event
       // collect all metadata
       let allMetadata = {
@@ -622,6 +620,7 @@ export class Service {
           subject
         };
         this.topics['ostorage'].emit('objectDownloadRequested', objectDownloadRequestPayload);
+        this.logger.info('Emitted Event objectDownloadRequested successfully', objectDownloadRequestPayload);
       }
       return;
     }
@@ -879,6 +878,7 @@ export class Service {
         }
         let url = bucketWithKey ? `//${bucketWithKey}` : `//${bucket}/${key}`;
         const tags = options && options.tags;
+        this.logger.info(`Object ${key} uploaded successfully to bucket ${bucket}`, { url });
         return {
           response: {
             payload: { key, bucket, url, meta, tags, length },
@@ -906,6 +906,7 @@ export class Service {
 
   async move(request: MoveRequestList, context?: any): Promise<DeepPartial<MoveResponseList>> {
     let { items, subject } = request;
+    this.logger.info('Received a request to Move Object', request);
     let moveResponse: MoveResponseList = {
       response: [],
       operation_status: { code: 0, message: '' }
@@ -983,6 +984,7 @@ export class Service {
       }
     }
     moveResponse.operation_status = { code: 200, message: 'success' };
+    this.logger.info('Move Object response', moveResponse);
     return moveResponse;
   }
 
@@ -999,6 +1001,7 @@ export class Service {
     if (subject && subject.scope) {
       destinationSubjectScope = subject.scope;
     }
+    this.logger.info('Received a request to Copy Object', request);
     if (request && request.items) {
       const itemsList = request.items;
       for (const item of itemsList) {
@@ -1128,8 +1131,8 @@ export class Service {
         subject.scope = destinationSubjectScope;
         // target entity for ACS is destination bucket here
         // For Create ACS check use the meta ACL as passed from the subject
-        if (metaObj == undefined){
-          metaObj = {acl: []};
+        if (metaObj == undefined) {
+          metaObj = { acl: [] };
         }
         let sourceACL = metaObj.acl;
         metaObj.acl = meta?.acl ? meta.acl : [];
@@ -1386,7 +1389,7 @@ export class Service {
                 } else {
                   const eTag = data.CopyObjectResult.ETag;
                   const lastModified = data.CopyObjectResult.LastModified;
-                  this.logger.info('Copy object successful!', {
+                  this.logger.info('Copy object successful', {
                     Bucket: bucket, Key: key, ETag: eTag, LastModified: lastModified
                   });
                   resolve(data);
@@ -1394,6 +1397,7 @@ export class Service {
               });
             });
           } catch (err) {
+            this.logger.error('Error copying object', { code: err.code, message: err.message, stack: err.stack });
             grpcResponse.response.push({
               status: {
                 id: key,
@@ -1419,6 +1423,7 @@ export class Service {
       }
     }
     grpcResponse.operation_status = { code: 200, message: 'success' };
+    this.logger.info('Copy Object response', grpcResponse);
     return grpcResponse;
   }
 
