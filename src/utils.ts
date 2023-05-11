@@ -150,7 +150,7 @@ export const getHeadObject = async (headObjectParams: HeadObjectParams,
             });
           // map the s3 error codes to standard chassis-srv errors
           if (err.code === 'NotFound') {
-            logger.info(`Key ${headObjectParams.Key} does not exist`);
+            logger.info(`Object metadata for Key ${headObjectParams.Key} not found`);
             resolve({
               status: {
                 id: headObjectParams.Key,
