@@ -1,17 +1,15 @@
 import {
   AuthZAction, PolicySetRQResponse, accessRequest,
-  DecisionResponse, Operation
+  DecisionResponse, Operation, ACSClientContext, Resource
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { createLogger } from '@restorecommerce/logger';
 import { createChannel, createClient } from '@restorecommerce/grpc-client';
-import { ServiceDefinition as UserServiceDefinition, ServiceClient as UserServiceClient } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
-import { errors } from '@restorecommerce/chassis-srv';
+import { UserServiceDefinition, UserServiceClient } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import { HeadObjectParams } from './interfaces';
 import { S3 } from 'aws-sdk';
 import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
-import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 
 export interface HierarchicalScope {
   id: string;
@@ -58,35 +56,6 @@ const getUserServiceClient = async () => {
   return idsClientInstance;
 };
 
-export interface Resource {
-  resource: string;
-  id?: string | string[]; // for what is allowed operation id is not mandatory
-  property?: string[];
-}
-
-export interface Attribute {
-  id: string;
-  value: string;
-  attribute: Attribute[];
-}
-
-export interface CtxResource {
-  id: string;
-  meta: {
-    created?: number;
-    modified?: number;
-    modified_by?: string;
-    owner: Attribute[]; // id and owner is mandatory in ctx resource other attributes are optional
-  };
-  [key: string]: any;
-}
-
-export interface GQLClientContext {
-  // if subject is missing by default it will be treated as unauthenticated subject
-  subject?: Subject;
-  resources?: CtxResource[];
-}
-
 /**
  * Perform an access request using inputs from a GQL request
  *
@@ -96,7 +65,7 @@ export interface GQLClientContext {
  * @param operation The operation to invoke either isAllowed or whatIsAllowed
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
-export async function checkAccessRequest(ctx: GQLClientContext, resource: Resource[], action: AuthZAction,
+export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction,
   operation: Operation): Promise<DecisionResponse | PolicySetRQResponse> {
   let subject = ctx.subject;
   // resolve subject id using findByToken api and update subject with id
@@ -117,7 +86,7 @@ export async function checkAccessRequest(ctx: GQLClientContext, resource: Resour
   } catch (err) {
     return {
       decision: Response_Decision.DENY,
-      obligation: [],
+      obligations: [],
       operation_status: {
         code: err.code || 500,
         message: err.details || err.message,

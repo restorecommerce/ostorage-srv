@@ -1,6 +1,6 @@
 import * as _ from 'lodash';
 import * as aws from 'aws-sdk';
-import { Readable, Transform } from 'stream';
+import { Readable } from 'stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import {
   checkAccessRequest, unmarshallProtobufAny,
@@ -14,7 +14,6 @@ import { CopyObjectParams } from './interfaces';
 import { RedisClientType } from 'redis';
 import { ListObjectsV2Request } from 'aws-sdk/clients/s3';
 import {
-  ServiceServiceImplementation as OStorageServiceServiceImplementation,
   ServerStreamingMethodResult, DeepPartial, Object as PutObject, ObjectResponse, ListRequest,
   ListResponse, GetRequest, Options, PutResponse, MoveRequestList,
   MoveResponseList, CopyResponseList, CopyRequestList, CopyResponseItem, DeleteRequest
@@ -24,9 +23,8 @@ import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-serve
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
 import { DeleteResponse } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
-import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 
-const META_OWNER = 'meta.owner';
+const META_OWNER = 'meta.owners';
 const EQ = 'eq';
 
 const OPERATION_STATUS_SUCCESS = {
@@ -188,15 +186,15 @@ export class Service {
       if (filter && filter.field == META_OWNER && filter.operation == EQ && filter.value) {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-        if (object && object.meta && object.meta.owner && _.isArray(object.meta.owner)) {
-          for (let idVal of object.meta.owner) {
+        if (object && object.meta && object.meta.owners && _.isArray(object.meta.owners)) {
+          for (let idVal of object.meta.owners) {
             if (idVal.id === ownerInstanceURN) {
               metaOwnerVal = idVal.value;
             }
           }
           // check only for the files matching the requested Owner Organizations
           if (filter.value == metaOwnerVal) {
-            listResponse.response.push({
+            listResponse.responses.push({
               payload: object,
               status: { id: object.object_name, code: 200, message: 'success' }
             });
@@ -204,7 +202,7 @@ export class Service {
         }
       }
     } else { // else return all data
-      listResponse.response.push({
+      listResponse.responses.push({
         payload: object,
         status: { id: object.object_name, code: 200, message: 'success' }
       });
@@ -222,7 +220,7 @@ export class Service {
       ctx.subject = subject;
       ctx.resources = [];
       acsResponse = await checkAccessRequest(ctx, [{ resource: bucket }], AuthZAction.READ,
-        Operation.whatIsAllowed);
+        Operation.whatIsAllowed) as PolicySetRQResponse;
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for list operation', err);
       return {
@@ -244,7 +242,7 @@ export class Service {
     let customArgsFilter, ownerValues, ownerIndicatorEntity;
     if (customArgs && customArgs.value) {
       customArgsFilter = JSON.parse(customArgs.value.toString());
-      // applicable target owner instances
+      // applicable target owners instances
       ownerValues = customArgsFilter.instance;
       ownerIndicatorEntity = customArgsFilter.entity;
     }
@@ -256,7 +254,7 @@ export class Service {
       buckets = this.buckets;
     }
     let listResponse: ListResponse = {
-      response: [],
+      responses: [],
       operation_status: { code: 0, message: '' }
     };
 
@@ -313,13 +311,13 @@ export class Service {
             let object = { object_name: objectName, url, meta: objectMeta };
             // authorization filter check
             if (this.cfg.get('authorization:enabled')) {
-              // if target objects owner instance `ownerInst` is contained in the
+              // if target objects owners instance `ownerInst` is contained in the
               // list of applicable `ownerValues` returned from ACS ie. ownerValues.includes(ownerInst)
               // then its considred a match for further filtering based on filter field if it exists
               let match = false;
               let ownerInst;
-              if (objectMeta && objectMeta.owner) {
-                for (let idVal of objectMeta.owner) {
+              if (objectMeta?.owners?.length > 0 ) {
+                for (let idVal of objectMeta.owners) {
                   if (idVal.id === ownerIndictaorEntURN && idVal.value === ownerIndicatorEntity) {
                     match = true;
                   }
@@ -332,7 +330,7 @@ export class Service {
                 }
                 // no scoping defined in the Rule
                 if (!ownerValues) {
-                  listResponse.response.push({
+                  listResponse.responses.push({
                     payload: object,
                     status: { id: objectName, code: 200, message: 'success' }
                   });
@@ -513,15 +511,15 @@ export class Service {
       // have no meta stored so first check if meta is defined
       // before making the ACS request
 
-      if (metaObj && metaObj.owner && metaObj.owner.length > 0) {
+      if (metaObj && metaObj.owners && metaObj.owners.length > 0) {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-        for (let idVal of metaObj.owner) {
+        for (let idVal of metaObj.owners) {
           if (idVal.id === ownerInstanceURN) {
             metaOwnerVal = idVal.value;
           }
         }
-        // restore scope for acs check from metaObj owner
+        // restore scope for acs check from metaObj owners
         subject.scope = metaOwnerVal;
       } else {
         this.logger.debug('Object metadata not found');
@@ -627,7 +625,7 @@ export class Service {
   }
 
   /**
-   * creates meta object containing owner information
+   * creates meta object containing owners information
    * @param reaources resource
    * @param orgKey orgKey
    */
@@ -653,8 +651,8 @@ export class Service {
     if (_.isEmpty(resource.meta)) {
       resource.meta = {};
     }
-    if (_.isEmpty(resource.meta.owner)) {
-      resource.meta.owner = ownerAttributes;
+    if (_.isEmpty(resource.meta.owners)) {
+      resource.meta.owners = ownerAttributes;
     }
     return resource;
   }
@@ -908,7 +906,7 @@ export class Service {
     let { items, subject } = request;
     this.logger.info('Received a request to Move Object', request);
     let moveResponse: MoveResponseList = {
-      response: [],
+      responses: [],
       operation_status: { code: 0, message: '' }
     };
     if (_.isEmpty(items)) {
@@ -932,7 +930,7 @@ export class Service {
       const copyResponse = await this.copy({ items: [item as any], subject }, context);
       // if copyResponse is success for each of the object then delete the sourceObject
       if (copyResponse?.operation_status?.code === 200) {
-        for (let response of copyResponse.response) {
+        for (let response of copyResponse.responses) {
           if (response && response?.status?.code === 200) {
             // delete sourceObject Object
             const payload = response.payload;
@@ -950,7 +948,7 @@ export class Service {
                 (response.payload as any).sourceObject = response.payload.copySource;
                 delete response.payload.copySource;
               }
-              moveResponse.response.push({
+              moveResponse.responses.push({
                 payload: (response.payload as any),
                 status: {
                   id: payload.key,
@@ -960,7 +958,7 @@ export class Service {
               });
             } else {
               // fail status
-              moveResponse.response.push({
+              moveResponse.responses.push({
                 status: {
                   id: payload.key,
                   code: deleteResponseCode,
@@ -970,7 +968,7 @@ export class Service {
             }
           } else {
             // fail status
-            moveResponse.response.push({
+            moveResponse.responses.push({
               status: {
                 id: response.status.id,
                 code: response.status.code,
@@ -994,7 +992,7 @@ export class Service {
     let key: string;
     let meta: Meta;
     let options: Options;
-    let grpcResponse: CopyResponseList = { response: [], operation_status: { code: 0, message: '' } };
+    let grpcResponse: CopyResponseList = { responses: [], operation_status: { code: 0, message: '' } };
     let copyObjectResult;
     let subject = request.subject;
     let destinationSubjectScope; // scope for destination bucket
@@ -1017,7 +1015,7 @@ export class Service {
         // Regex to extract bucket name and key from copySource
         // ex: copySource= /bucketName/sample-directory/objectName.txt
         if (!copySource) {
-          grpcResponse.response.push({
+          grpcResponse.responses.push({
             status: {
               id: key,
               code: 400,
@@ -1046,7 +1044,7 @@ export class Service {
           meta.modified = new Date(headObject?.LastModified).getTime();
         }
         if (headObject && headObject.status) {
-          grpcResponse.response.push({
+          grpcResponse.responses.push({
             status: {
               id: sourceKeyName,
               code: headObject.status.code,
@@ -1083,15 +1081,15 @@ export class Service {
         if (!subject) {
           subject = { id: '', unauthenticated: undefined, scope: '', token: '' };
         }
-        if (metaObj && metaObj.owner && metaObj.owner.length > 0) {
+        if (metaObj?.owners?.length > 0) {
           let metaOwnerVal;
           const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-          for (let idVal of metaObj.owner) {
+          for (let idVal of metaObj.owners) {
             if (idVal.id === ownerInstanceURN) {
               metaOwnerVal = idVal.value;
             }
           }
-          // restore scope for acs check from metaObj owner
+          // restore scope for acs check from metaObj owners
           subject.scope = metaOwnerVal;
         }
 
@@ -1107,7 +1105,7 @@ export class Service {
             Operation.isAllowed);
         } catch (err) {
           this.logger.error('Error occurred requesting access-control-srv for copy read', err);
-          grpcResponse.response.push({
+          grpcResponse.responses.push({
             status: {
               id: sourceKeyName,
               code: err.code || 500,
@@ -1117,7 +1115,7 @@ export class Service {
           continue;
         }
         if (acsResponse.decision != Response_Decision.PERMIT) {
-          grpcResponse.response.push({
+          grpcResponse.responses.push({
             status: {
               id: sourceKeyName,
               code: acsResponse.operation_status.code || 500,
@@ -1132,10 +1130,10 @@ export class Service {
         // target entity for ACS is destination bucket here
         // For Create ACS check use the meta ACL as passed from the subject
         if (metaObj == undefined) {
-          metaObj = { acl: [] };
+          metaObj = { acls: [] };
         }
-        let sourceACL = metaObj.acl;
-        metaObj.acl = meta?.acl ? meta.acl : [];
+        let sourceACL = metaObj.acls;
+        metaObj.acl = meta?.acls ? meta.acls : [];
         resource.meta = metaObj;
         if (!ctx) { ctx = {}; };
         ctx.subject = subject;
@@ -1143,7 +1141,7 @@ export class Service {
         let writeAccessResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: resource.key }],
           AuthZAction.CREATE, Operation.isAllowed);
         if (writeAccessResponse.decision != Response_Decision.PERMIT) {
-          grpcResponse.response.push({
+          grpcResponse.responses.push({
             status: {
               id: key,
               code: writeAccessResponse.operation_status.code || 500,
@@ -1176,23 +1174,23 @@ export class Service {
           if (!meta) {
             meta = {} as any;
           }
-          if (_.isEmpty(meta.owner)) {
+          if (_.isEmpty(meta.owners)) {
             const urns = this.cfg.get('authorization:urns');
-            meta.owner = [{
+            meta.owners = [{
               id: urns.ownerIndicatoryEntity,
               value: urns.organization,
-              attribute: []
+              attributes: []
             },
             {
               id: urns.ownerInstance,
               value: destinationSubjectScope,
-              attribute: []
+              attributes: []
             }];
           }
-          if (meta && meta.acl && !_.isEmpty(meta.acl)) {
+          if (meta && meta.acls && !_.isEmpty(meta.acls)) {
             // store meta acl to redis
-            await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
-            delete meta.acl;
+            await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acls));
+            delete meta.acls;
           } else if (sourceACL && !_.isEmpty(sourceACL)) {
             // store source acl to redis
             await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(sourceACL));
@@ -1272,7 +1270,7 @@ export class Service {
               });
             });
           } catch (err) {
-            grpcResponse.response.push({
+            grpcResponse.responses.push({
               status: {
                 id: key,
                 code: err.code || 500,
@@ -1282,30 +1280,30 @@ export class Service {
           }
         } else {
 
-          // CASE 2: No options provided => copy the object as it is and update user defined metadata (owner)
+          // CASE 2: No options provided => copy the object as it is and update user defined metadata (owners)
 
           // 1. Add user defined Metadata if its not provided
           params.MetadataDirective = 'REPLACE';
           if (!meta) {
             meta = {} as any;
           }
-          if (_.isEmpty(meta.owner)) {
+          if (_.isEmpty(meta.owners)) {
             const urns = this.cfg.get('authorization:urns');
-            meta.owner = [{
+            meta.owners = [{
               id: urns.ownerIndicatoryEntity,
               value: urns.organization,
-              attribute: []
+              attributes: []
             },
             {
               id: urns.ownerInstance,
               value: destinationSubjectScope,
-              attribute: []
+              attributes: []
             }];
           }
-          if (meta && meta.acl && !_.isEmpty(meta.acl)) {
+          if (meta && meta.acls && !_.isEmpty(meta.acls)) {
             // store meta acl to redis
-            await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
-            delete meta.acl;
+            await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acls));
+            delete meta.acls;
           } else if (sourceACL && !_.isEmpty(sourceACL)) {
             // store source acl to redis
             await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(sourceACL));
@@ -1398,7 +1396,7 @@ export class Service {
             });
           } catch (err) {
             this.logger.error('Error copying object', { code: err.code, message: err.message, stack: err.stack });
-            grpcResponse.response.push({
+            grpcResponse.responses.push({
               status: {
                 id: key,
                 code: err.code || 500,
@@ -1416,7 +1414,7 @@ export class Service {
             meta,
             options
           };
-          grpcResponse.response.push({ payload: copiedObject, status: { id: key, code: 200, message: 'success' } });
+          grpcResponse.responses.push({ payload: copiedObject, status: { id: key, code: 200, message: 'success' } });
         } else {
           this.logger.error('Copy object failed for:', { DestinationBucket: bucket, CopySource: copySource, Key: key, Meta: meta, Options: options });
         }

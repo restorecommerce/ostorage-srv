@@ -1,9 +1,9 @@
 export const permitCreateObjRule = {
   id: 'permit_rule_id',
   target: {
-    action: [],
+    actions: [],
     resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:test.Test' }],
-    subject: [
+    subjects: [
       {
         id: 'urn:restorecommerce:acs:names:role',
         value: 'admin-r-id'
@@ -19,9 +19,9 @@ export const permitCreateObjRule = {
 export const denyCreateObjRule = {
   id: 'permit_rule_id',
   target: {
-    action: [],
+    actions: [],
     resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:test.Test' }],
-    subject: [
+    subjects: [
       {
         id: 'urn:restorecommerce:acs:names:role',
         value: 'user-r-id'
@@ -44,12 +44,12 @@ export const bucketPolicySetRQ = {
           combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
           id: 'bucket_test_policy_id',
           target: {
-            action: [],
+            actions: [],
             resources: [{
               id: 'urn:restorecommerce:acs:names:model:entity',
               value: 'urn:restorecommerce:acs:model:test.Test'
             }],
-            subject: []
+            subjects: []
           }, effect: '',
           rules: [],
           has_rules: true

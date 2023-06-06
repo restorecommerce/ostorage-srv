@@ -12,7 +12,7 @@ import * as grpc from '@grpc/grpc-js';
 import { unmarshallProtobufAny } from "../lib/utils";
 import { Transform } from 'stream';
 import * as _ from 'lodash';
-import { ServiceClient as OstorageServiceClient, ServiceDefinition as OstorageServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
+import { ObjectServiceClient, ObjectServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
 import { createClient as RedisCreateClient, RedisClientType } from 'redis';
 
 let cfg: any;
@@ -21,7 +21,7 @@ let worker: Worker;
 // For event listeners
 let events: Events;
 let topic: Topic;
-let ostorageService: OstorageServiceClient;
+let ostorageService: ObjectServiceClient;
 let redisClient: RedisClientType;
 let tokenRedisClient: RedisClientType;
 
@@ -47,15 +47,15 @@ const options = {
 
 let meta = {
   modified_by: 'SYSTEM',
-  owner: [{
+  owners: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
     value: 'urn:restorecommerce:acs:model:organization.Organization',
-    attribute: []
+    attributes: []
   },
   {
     id: 'urn:restorecommerce:acs:names:ownerInstance',
     value: 'orgC',
-    attribute: []
+    attributes: []
   }]
 };
 
@@ -102,7 +102,7 @@ const acsSubject = {
 
 const PROTO_PATH: string = 'node_modules/@restorecommerce/protos/io/restorecommerce/access_control.proto';
 const PKG_NAME: string = 'io.restorecommerce.access_control';
-const SERVICE_NAME: string = 'Service';
+const SERVICE_NAME: string = 'AccessControlService';
 
 const pkgDef: grpc.GrpcObject = grpc.loadPackageDefinition(
   proto_loader.loadSync(PROTO_PATH, {
@@ -128,7 +128,7 @@ const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
     isAllowed: (call: any, callback: any) => {
       if (call?.request?.context?.resources[0]?.value) {
         let ctxResources = JSON.parse(call.request.context.resources[0].value.toString());
-        if (ctxResources?.id === 'config_invalid_scope' || call?.request?.target?.subject[0]?.value.startsWith('invalid_subject_id')) {
+        if (ctxResources?.id === 'config_invalid_scope' || call?.request?.target?.subjects[0]?.value.startsWith('invalid_subject_id')) {
           callback(null, { decision: 'DENY' });
         } else {
           const isAllowedResponse = methodWithOutput.filter(e => e.method === 'IsAllowed');
@@ -167,7 +167,7 @@ const stopGrpcMockServer = async () => {
 
 const IDS_PROTO_PATH = 'node_modules/@restorecommerce/protos/io/restorecommerce/user.proto';
 const IDS_PKG_NAME = 'io.restorecommerce.user';
-const IDS_SERVICE_NAME = 'Service';
+const IDS_SERVICE_NAME = 'UserService';
 
 const mockServerIDS = new GrpcMockServer('localhost:50051');
 
@@ -223,14 +223,14 @@ async function stop(): Promise<void> {
 }
 
 // returns a gRPC service
-async function getOstorageService(clientCfg: any): Promise<OstorageServiceClient> {
-  let ostorageService: OstorageServiceClient;
+async function getOstorageService(clientCfg: any): Promise<ObjectServiceClient> {
+  let ostorageService: ObjectServiceClient;
   logger = worker.logger;
   if (clientCfg) {
     ostorageService = createClient({
       ...clientCfg,
       logger
-    }, OstorageServiceDefinition, createChannel(clientCfg.address));
+    }, ObjectServiceDefinition, createChannel(clientCfg.address));
   }
   return ostorageService;
 }
@@ -343,8 +343,8 @@ describe('testing ostorage-srv with ACS enabled', () => {
     });
     it('With valid subject scope should be able to list the object', async () => {
       let result = await ostorageService.list({ bucket: 'test', subject });
-      should.exist(result.response);
-      result.response.length.should.equal(1);
+      should.exist(result.responses);
+      result.responses.length.should.equal(1);
     });
     it('With invalid subject scope should throw an error when storing object', async () => {
       subject = acsSubject;
@@ -405,7 +405,7 @@ describe('testing ostorage-srv with ACS enabled', () => {
         bucket: 'test',
         subject
       });
-      should(result.response).empty;
+      should(result.responses).empty;
       result.operation_status.code.should.equal(403);
       result.operation_status.message.should.equal('Access not allowed for request with subject:invalid_subject_id_2, resource:test, action:READ, target_scope:orgD; the response was DENY');
       sleep.sleep(3);
@@ -451,10 +451,10 @@ describe('testing ostorage-srv with ACS enabled', () => {
       };
       const result = await ostorageService.copy(data);
 
-      should.exist(result.response);
-      result.response[0].status.id.should.equal('config_acs_enabled.json');
-      result.response[0].status.code.should.equal(403);
-      result.response[0].status.message.should.equal('Access not allowed for request with subject:invalid_subject_id_4, resource:test, action:READ, target_scope:orgC; the response was DENY');
+      should.exist(result.responses);
+      result.responses[0].status.id.should.equal('config_acs_enabled.json');
+      result.responses[0].status.code.should.equal(403);
+      result.responses[0].status.message.should.equal('Access not allowed for request with subject:invalid_subject_id_4, resource:test, action:READ, target_scope:orgC; the response was DENY');
       sleep.sleep(3);
     });
     it('With valid scope should replace the object', async () => {
@@ -482,20 +482,20 @@ describe('testing ostorage-srv with ACS enabled', () => {
         subject // invalid subject scope containg 'orgD'
       };
       const result = await ostorageService.copy(data);
-      should.exist(result.response);
+      should.exist(result.responses);
 
-      let payload = result.response[0].payload;
+      let payload = result.responses[0].payload;
       should.exist(payload.bucket);
       should.exist(payload.copySource);
       should.exist(payload.key);
-      should.exist(payload.meta.owner[1].value);
+      should.exist(payload.meta.owners[1].value);
       should.exist(payload.options.encoding);
       should.exist(payload.options.tags[0].id);
 
       payload.bucket.should.equal('test');
       payload.copySource.should.equal('test/config_acs_enabled.json');
       payload.key.should.equal('config_acs_enabled.json');
-      payload.meta.owner.should.deepEqual(meta.owner);
+      payload.meta.owners.should.deepEqual(meta.owners);
       payload.options.encoding.should.equal('gzip');
       payload.options.tags[0].id.should.equal('id_1');
       sleep.sleep(3);
@@ -529,7 +529,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
   describe('Object Storage with ACS disabled', () => {
     it('Should be empty initially', async () => {
       let result = await ostorageService.list({});
-      should(result.response).empty;
+      should(result.responses).empty;
       result.operation_status.code.should.equal(200);
       result.operation_status.message.should.equal('success');
     });
@@ -578,10 +578,10 @@ describe('testing ostorage-srv with ACS disabled', () => {
         bucket: 'test'
       });
       should.exist(listResponse);
-      should.exist(listResponse.response);
-      should.exist(listResponse.response[0].payload);
-      should(listResponse.response).length(1);
-      listResponse.response[0].payload.object_name.should.equal('ä_ö_ü.json');
+      should.exist(listResponse.responses);
+      should.exist(listResponse.responses[0].payload);
+      should(listResponse.responses).length(1);
+      listResponse.responses[0].payload.object_name.should.equal('ä_ö_ü.json');
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
 
@@ -602,7 +602,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
           const objectValue = JSON.parse(data.response.payload.object.toString()).testKey;
           should.exist(objectValue);
           objectValue.should.equal('testValue');
-          meta.owner.should.deepEqual(data.response.payload.meta.owner);
+          meta.owners.should.deepEqual(data.response.payload.meta.owners);
         } else {
           // emitted on end event with no payload
           should.exist(data.operation_status);
@@ -622,17 +622,17 @@ describe('testing ostorage-srv with ACS disabled', () => {
         }]
       });
       // validate moveResponse
-      should.exist(moveResponse.response);
-      should(moveResponse.response).length(1);
-      should.exist(moveResponse.response[0].payload);
-      should.exist(moveResponse.response[0].status.code);
-      moveResponse.response[0].status.code.should.equal(200);
+      should.exist(moveResponse.responses);
+      should(moveResponse.responses).length(1);
+      should.exist(moveResponse.responses[0].payload);
+      should.exist(moveResponse.responses[0].status.code);
+      moveResponse.responses[0].status.code.should.equal(200);
 
       // validate test bucket response should be empty
       listResponse = await ostorageService.list({
         bucket: 'test',
       });
-      should(listResponse.response).empty;
+      should(listResponse.responses).empty;
       listResponse.operation_status.code.should.equal(200);
 
       // validate test2 bucket response should contain 2 objects
@@ -640,10 +640,10 @@ describe('testing ostorage-srv with ACS disabled', () => {
         bucket: 'test2',
       });
       should.exist(listResponse2);
-      should.exist(listResponse2.response);
-      should.exist(listResponse2.response[0].payload);
-      listResponse2.response[0].payload.url.should.equal('//test2/moved.json');
-      should(listResponse2.response).length(1);
+      should.exist(listResponse2.responses);
+      should.exist(listResponse2.responses[0].payload);
+      listResponse2.responses[0].payload.url.should.equal('//test2/moved.json');
+      should(listResponse2.responses).length(1);
       listResponse2.operation_status.code.should.equal(200);
       listResponse2.operation_status.message.should.equal('success');
       sleep.sleep(3);
@@ -691,7 +691,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       putResponse.response.payload.url.should.equal('//test/config.json');
 
       // check meta
-      putResponse.response.payload.meta.owner.should.deepEqual(meta.owner);
+      putResponse.response.payload.meta.owners.should.deepEqual(meta.owners);
 
       // check tags
       putResponse.response.payload.tags[0].id.should.equal('id_1');
@@ -722,7 +722,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
           const objectValue = JSON.parse(data.response.payload.object.toString()).testKey;
           should.exist(objectValue);
           objectValue.should.equal('testValue');
-          meta.owner.should.deepEqual(data.response.payload.meta.owner);
+          meta.owners.should.deepEqual(data.response.payload.meta.owners);
         } else {
           // emitted on end event with no payload
           should.exist(data.operation_status);
@@ -810,7 +810,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
             const objectValue = JSON.parse(data.response.payload.object.toString()).testKey;
             should.exist(objectValue);
             objectValue.should.equal('testValue');
-            meta.owner.should.deepEqual(data.response.payload.meta.owner);
+            meta.owners.should.deepEqual(data.response.payload.meta.owners);
           } else {
             // emitted on end event with no payload
             should.exist(data.operation_status);
@@ -826,9 +826,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
         bucket: 'test'
       });
       should.exist(listResponse);
-      should.exist(listResponse.response);
-      should.exist(listResponse.response[0].payload);
-      should(listResponse.response).length(1);
+      should.exist(listResponse.responses);
+      should.exist(listResponse.responses[0].payload);
+      should(listResponse.responses).length(1);
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
       sleep.sleep(3);
@@ -838,7 +838,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       let result = await ostorageService.list({
         bucket: 'invalid_bucket'
       });
-      should(result.response).length(0);
+      should(result.responses).length(0);
       result.operation_status.message.should.equal('The specified bucket is not valid.');
       sleep.sleep(3);
     });
@@ -867,21 +867,21 @@ describe('testing ostorage-srv with ACS disabled', () => {
       };
 
       let replaceResponse = await ostorageService.copy(data);
-      should.exist(replaceResponse.response);
-      should.exist(replaceResponse.response[0].payload);
+      should.exist(replaceResponse.responses);
+      should.exist(replaceResponse.responses[0].payload);
 
-      let payload = replaceResponse.response[0].payload;
+      let payload = replaceResponse.responses[0].payload;
       should.exist(payload.bucket);
       should.exist(payload.copySource);
       should.exist(payload.key);
-      should.exist(payload.meta.owner[1].value);
+      should.exist(payload.meta.owners[1].value);
       should.exist(payload.options.encoding);
       should.exist(payload.options.tags[0].id);
 
       payload.bucket.should.equal('test');
       payload.copySource.should.equal('test/config.json');
       payload.key.should.equal('config.json');
-      payload.meta.owner.should.deepEqual(meta.owner);
+      payload.meta.owners.should.deepEqual(meta.owners);
       payload.options.encoding.should.equal('gzip');
       payload.options.tags[0].id.should.equal('id_1');
       sleep.sleep(3);
@@ -926,10 +926,10 @@ describe('testing ostorage-srv with ACS disabled', () => {
         bucket: 'test'
       });
       should.exist(listResponse);
-      should.exist(listResponse.response);
-      should.exist(listResponse.response[0].payload);
-      should.exist(listResponse.response[1].payload);
-      should(listResponse.response).length(2);
+      should.exist(listResponse.responses);
+      should.exist(listResponse.responses[0].payload);
+      should.exist(listResponse.responses[1].payload);
+      should(listResponse.responses).length(2);
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
       sleep.sleep(3);
@@ -941,9 +941,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
         prefix: 'con'
       });
       should.exist(listResponse);
-      should.exist(listResponse.response);
-      should.exist(listResponse.response[0].payload);
-      should(listResponse.response).length(1);
+      should.exist(listResponse.responses);
+      should.exist(listResponse.responses[0].payload);
+      should(listResponse.responses).length(1);
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
       sleep.sleep(3);
@@ -955,9 +955,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
         max_keys: 1
       });
       should.exist(listResponse);
-      should.exist(listResponse.response);
-      should.exist(listResponse.response[0].payload);
-      should(listResponse.response).length(1);
+      should.exist(listResponse.responses);
+      should.exist(listResponse.responses[0].payload);
+      should(listResponse.responses).length(1);
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
       sleep.sleep(3);
@@ -976,19 +976,19 @@ describe('testing ostorage-srv with ACS disabled', () => {
         }]
       });
       // validate moveResponse
-      should.exist(moveResponse.response);
-      should(moveResponse.response).length(2);
-      should.exist(moveResponse.response[0].payload);
-      should.exist(moveResponse.response[1].payload);
-      should.exist(moveResponse.response[0].status.code);
-      moveResponse.response[0].status.code.should.equal(200);
-      moveResponse.response[1].status.code.should.equal(200);
+      should.exist(moveResponse.responses);
+      should(moveResponse.responses).length(2);
+      should.exist(moveResponse.responses[0].payload);
+      should.exist(moveResponse.responses[1].payload);
+      should.exist(moveResponse.responses[0].status.code);
+      moveResponse.responses[0].status.code.should.equal(200);
+      moveResponse.responses[1].status.code.should.equal(200);
 
       // validate test bucket response should be empty
       let listResponse = await ostorageService.list({
         bucket: 'test',
       });
-      should(listResponse.response).empty;
+      should(listResponse.responses).empty;
       listResponse.operation_status.code.should.equal(200);
 
       // validate test2 bucket response should contain 2 objects
@@ -996,12 +996,12 @@ describe('testing ostorage-srv with ACS disabled', () => {
         bucket: 'test2',
       });
       should.exist(listResponse2);
-      should.exist(listResponse2.response);
-      should.exist(listResponse2.response[0].payload);
-      should.exist(listResponse2.response[1].payload);
-      listResponse2.response[0].payload.url.should.equal('//test2/config_new.json');
-      listResponse2.response[1].payload.url.should.equal('//test2/second_config_new.json');
-      should(listResponse2.response).length(2);
+      should.exist(listResponse2.responses);
+      should.exist(listResponse2.responses[0].payload);
+      should.exist(listResponse2.responses[1].payload);
+      listResponse2.responses[0].payload.url.should.equal('//test2/config_new.json');
+      listResponse2.responses[1].payload.url.should.equal('//test2/second_config_new.json');
+      should(listResponse2.responses).length(2);
       listResponse2.operation_status.code.should.equal(200);
       listResponse2.operation_status.message.should.equal('success');
       sleep.sleep(3);

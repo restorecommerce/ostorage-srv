@@ -9,14 +9,14 @@ import { createClient, RedisClientType } from 'redis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import { Logger } from 'winston';
 import { createChannel, createClient as createGrpcClient } from '@restorecommerce/grpc-client';
-import { ServiceDefinition as OStorageServiceDefinition, protoMetadata as ostorageMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
-import { ServiceDefinition as CommandInterfaceServiceDefinition, protoMetadata as commandInterfaceMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface';
+import { ObjectServiceDefinition, protoMetadata as ostorageMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
+import { CommandInterfaceServiceDefinition, protoMetadata as commandInterfaceMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface';
 import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health';
 import {
   protoMetadata as reflectionMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/reflection/v1alpha/reflection';
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
-import { ServiceClient as UserServiceClient, ServiceDefinition as UserServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+import { UserServiceClient, UserServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc';
 
 // register for kafka events
@@ -116,9 +116,9 @@ export class Worker {
     // list of service names
     const serviceNamesCfg = cfg.get('serviceNames');
     await server.bind(serviceNamesCfg.ostorage, {
-      service: OStorageServiceDefinition,
+      service: ObjectServiceDefinition,
       implementation: oss
-    } as any);
+    } as BindConfig<ObjectServiceDefinition>);
     await server.bind(serviceNamesCfg.cis, {
       service: CommandInterfaceServiceDefinition,
       implementation: cis
