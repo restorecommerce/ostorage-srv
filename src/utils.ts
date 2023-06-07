@@ -123,8 +123,8 @@ export const getHeadObject = async (headObjectParams: HeadObjectParams,
             resolve({
               status: {
                 id: headObjectParams.Key,
-                code: err.code || 500,
-                message: err.message
+                code: 404,
+                message: err.message ? err.message : `Object metadata for Key ${headObjectParams.Key} not found`
               }
             });
           }
@@ -137,13 +137,14 @@ export const getHeadObject = async (headObjectParams: HeadObjectParams,
         }
       });
     });
-  } catch (err) {
-    logger.error('Error occurred while retrieving metadata for object', err);
+  } catch (error) {
+    logger.error('Error occurred while retrieving metadata for object', {code: error.code, message: error.message, stack: error.stack});
+    const code = Number.isNaN(error.code) ? 500 : error.code;
     return {
       status: {
         id: headObjectParams.Key,
-        code: err.code || 500,
-        message: err.message
+        code,
+        message: error.message
       }
     };
   }
