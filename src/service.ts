@@ -576,7 +576,12 @@ export class Service {
         for await (const chunk of downloadable) {
           yield {
             response: {
-              payload: { bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj }
+              payload: { bucket, key, object: chunk, url: `//${bucket}/${key}`, options: optionsObj, meta: metaObj },
+              status: {
+                id: key,
+                code: 200,
+                message: 'success'
+              }
             }
           };
         }
