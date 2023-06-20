@@ -60,6 +60,14 @@
     "fieldOptions": {
       "omitFields": [
         "custom_arguments", "metadata"
+      ],
+      "bufferFields": [
+        {
+          "fieldPath": "decodedMsg.metadata"
+        },
+        {
+          "fieldPath": "messages.[0].metadata"
+        }
       ]
     }
   },

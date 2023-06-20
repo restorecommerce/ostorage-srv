@@ -1,3 +1,7 @@
+## 1.0.0 (June 20th, 2023)
+
+- updated dependencies and (change to major version due to migration to fully typed client, server from v0.3.3)
+
 ## 0.3.6 (February 3rd, 2023)
 
 - fix error reading `acl`
