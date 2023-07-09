@@ -94,7 +94,7 @@ export class Service {
               reject(err);
             }
           } else {
-            if (data && data.Rules) {
+            if (data?.Rules) {
               // rules are found, adding them to the list
               existingBucketRules.push(bucket);
               resolve(data);
@@ -181,19 +181,23 @@ export class Service {
 
   private filterObjects(requestFilter, object, listResponse) {
     // if filter is provided return data based on filter
-    if (requestFilter && requestFilter?.filter && !_.isEmpty(requestFilter?.filter)) {
-      const filter = requestFilter.filter[0];
-      if (filter && filter.field == META_OWNER && filter.operation == EQ && filter.value) {
+    if (requestFilter && requestFilter?.filters && !_.isEmpty(requestFilter?.filters)) {
+      const filters = requestFilter.filters[0];
+      if (filters && filters.field == META_OWNER && filters.operation == EQ && filters.value) {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-        if (object && object.meta && object.meta.owners && _.isArray(object.meta.owners)) {
-          for (let idVal of object.meta.owners) {
-            if (idVal.id === ownerInstanceURN) {
-              metaOwnerVal = idVal.value;
+        if (object?.meta?.owners && _.isArray(object.meta.owners)) {
+          for (let owner of object.meta.owners) {
+            if (owner.attributes.length > 0) {
+              for (let ownerInstObj of owner.attributes) {
+                if (ownerInstObj.id === ownerInstanceURN) {
+                  metaOwnerVal = ownerInstObj.value;
+                }
+              }
             }
           }
           // check only for the files matching the requested Owner Organizations
-          if (filter.value == metaOwnerVal) {
+          if (filters.value == metaOwnerVal) {
             listResponse.responses.push({
               payload: object,
               status: { id: object.object_name, code: 200, message: 'success' }
@@ -301,7 +305,7 @@ export class Service {
             const url = `//${bucket}/${eachObj.Key}`;
             const objectName = eachObj.Key;
             let objectMeta;
-            if (meta && meta.Metadata && meta.Metadata.meta) {
+            if (meta?.Metadata?.meta) {
               objectMeta = JSON.parse(meta.Metadata.meta);
               if (meta.LastModified && objectMeta) {
                 this.logger.debug('List api LastModified', { lastModified: meta?.LastModified });
@@ -314,19 +318,15 @@ export class Service {
               // if target objects owners instance `ownerInst` is contained in the
               // list of applicable `ownerValues` returned from ACS ie. ownerValues.includes(ownerInst)
               // then its considred a match for further filtering based on filter field if it exists
-              let match = false;
-              let ownerInst;
-              if (objectMeta?.owners?.length > 0 ) {
+              if (objectMeta?.owners?.length > 0) {
                 for (let idVal of objectMeta.owners) {
-                  if (idVal.id === ownerIndictaorEntURN && idVal.value === ownerIndicatorEntity) {
-                    match = true;
+                  if (idVal?.id === ownerIndictaorEntURN && idVal?.value === ownerIndicatorEntity && idVal?.attributes?.length > 0) {
+                    for (let ownInstObj of idVal.attributes) {
+                      if (ownInstObj?.id === ownerInstanceURN && ownInstObj?.value && ownerValues.includes(ownInstObj.value)) {
+                        this.filterObjects(filters, object, listResponse);
+                      }
+                    }
                   }
-                  if (idVal.id === ownerInstanceURN) {
-                    ownerInst = idVal.value;
-                  }
-                }
-                if (match && ownerInst && ownerValues.includes(ownerInst)) {
-                  this.filterObjects(filters, object, listResponse);
                 }
                 // no scoping defined in the Rule
                 if (!ownerValues) {
@@ -387,7 +387,7 @@ export class Service {
     // get metadata of the object stored in the S3 object storage
     const params = { Bucket: bucket, Key: key };
     let headObject: any = await getHeadObject(params, this.ossClient, this.logger);
-    if (headObject.status) {
+    if (headObject?.status) {
       yield {
         response: {
           payload: null,
@@ -491,17 +491,15 @@ export class Service {
         }
       }
       let tags: Attribute[] = [];
-      let tagObj;
-      if (objectTagging) {
+      if (objectTagging?.TagSet) {
         // transform received object to respect our own defined structure
         let receivedTags = objectTagging.TagSet;
-
-        for (let i = 0; i < receivedTags.length; i++) {
-          tagObj = {
-            id: receivedTags[i].Key,
-            value: receivedTags[i].Value
-          };
-          tags.push(tagObj);
+        for (let tagObj of receivedTags) {
+          tags.push({
+            id: tagObj.Key,
+            value: tagObj.Value,
+            attributes: []
+          });
         }
       }
 
@@ -514,9 +512,13 @@ export class Service {
       if (metaObj && metaObj.owners && metaObj.owners.length > 0) {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-        for (let idVal of metaObj.owners) {
-          if (idVal.id === ownerInstanceURN) {
-            metaOwnerVal = idVal.value;
+        for (let owner of metaObj.owners) {
+          if(owner.attributes.length > 0) {
+            for (let ownerInstObj of owner.attributes) {
+              if(ownerInstObj.id === ownerInstanceURN) {
+                metaOwnerVal = ownerInstObj.value;
+              }
+            }
           }
         }
         // restore scope for acs check from metaObj owners
@@ -612,7 +614,7 @@ export class Service {
 
       if (this.topics && this.topics['ostorage']) {
         // update downloader subject scope from findByToken with default_scope
-        if (subject && subject.token) {
+        if (subject?.token) {
           const dbSubject = await this.idsService.findByToken({ token: subject.token });
           subject.scope = dbSubject?.payload?.default_scope;
         }
@@ -639,17 +641,18 @@ export class Service {
     if (!_.isEmpty(subject)) {
       targetScope = subject.scope;
     }
-    let ownerAttributes = [];
+    let ownerAttributes: Attribute[] = [];
     const urns = this.cfg.get('authorization:urns');
     if (targetScope) {
       ownerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
-          value: urns.organization
-        },
-        {
-          id: urns.ownerInstance,
-          value: targetScope
+          value: urns.organization,
+          attributes: [{
+            id: urns.ownerInstance,
+            value: targetScope,
+            attributes: []
+          }]
         });
     }
 
@@ -1089,9 +1092,13 @@ export class Service {
         if (metaObj?.owners?.length > 0) {
           let metaOwnerVal;
           const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-          for (let idVal of metaObj.owners) {
-            if (idVal.id === ownerInstanceURN) {
-              metaOwnerVal = idVal.value;
+          for (let owner of metaObj.owners) {
+            if(owner.attributes.length > 0) {
+              for (let ownerInstObj of owner.attributes) {
+                if(ownerInstObj.id === ownerInstanceURN) {
+                  metaOwnerVal = ownerInstObj.value;
+                }
+              }
             }
           }
           // restore scope for acs check from metaObj owners
@@ -1184,12 +1191,11 @@ export class Service {
             meta.owners = [{
               id: urns.ownerIndicatoryEntity,
               value: urns.organization,
-              attributes: []
-            },
-            {
-              id: urns.ownerInstance,
-              value: destinationSubjectScope,
-              attributes: []
+              attributes: [{
+                id: urns.ownerInstance,
+                value: destinationSubjectScope,
+                attributes: []
+              }]
             }];
           }
           if (meta && meta.acls && !_.isEmpty(meta.acls)) {
@@ -1297,12 +1303,11 @@ export class Service {
             meta.owners = [{
               id: urns.ownerIndicatoryEntity,
               value: urns.organization,
-              attributes: []
-            },
-            {
-              id: urns.ownerInstance,
-              value: destinationSubjectScope,
-              attributes: []
+              attributes: [{
+                id: urns.ownerInstance,
+                value: destinationSubjectScope,
+                attributes: []
+              }]
             }];
           }
           if (meta && meta.acls && !_.isEmpty(meta.acls)) {

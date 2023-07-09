@@ -50,12 +50,11 @@ let meta = {
   owners: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
     value: 'urn:restorecommerce:acs:model:organization.Organization',
-    attributes: []
-  },
-  {
-    id: 'urn:restorecommerce:acs:names:ownerInstance',
-    value: 'orgC',
-    attributes: []
+    attributes: [{
+      id: 'urn:restorecommerce:acs:names:ownerInstance',
+      value: 'orgC',
+      attributes: []
+    }]
   }]
 };
 
@@ -75,11 +74,11 @@ const acsSubject = {
       role: 'admin-r-id',
       attributes: [{
         id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-        value: 'urn:restorecommerce:acs:model:organization.Organization'
-      },
-      {
-        id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-        value: 'mainOrg'
+        value: 'urn:restorecommerce:acs:model:organization.Organization',
+        attributes: [{
+          id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+          value: 'mainOrg'
+        }]
       }]
     }
   ],
@@ -488,7 +487,8 @@ describe('testing ostorage-srv with ACS enabled', () => {
       should.exist(payload.bucket);
       should.exist(payload.copySource);
       should.exist(payload.key);
-      should.exist(payload.meta.owners[1].value);
+      should.exist(payload.meta.owners[0].attributes[0].value);
+      payload.meta.owners[0].attributes[0].value.should.equal('orgC');
       should.exist(payload.options.encoding);
       should.exist(payload.options.tags[0].id);
 
@@ -874,7 +874,8 @@ describe('testing ostorage-srv with ACS disabled', () => {
       should.exist(payload.bucket);
       should.exist(payload.copySource);
       should.exist(payload.key);
-      should.exist(payload.meta.owners[1].value);
+      should.exist(payload.meta.owners[0].attributes[0].value);
+      payload.meta.owners[0].attributes[0].value.should.equal('orgC');
       should.exist(payload.options.encoding);
       should.exist(payload.options.tags[0].id);
 

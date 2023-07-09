@@ -113,10 +113,6 @@ export const getHeadObject = async (headObjectParams: HeadObjectParams,
     return new Promise((resolve, reject) => {
       ossClient.headObject(headObjectParams, (err: any, data) => {
         if (err) {
-          logger.error('Error occurred while retrieving metadata for object',
-            {
-              Bucket: headObjectParams.Bucket, Key: headObjectParams.Key, error: err, errorStack: err.stack
-            });
           // map the s3 error codes to standard chassis-srv errors
           if (err.code === 'NotFound') {
             logger.info(`Object metadata for Key ${headObjectParams.Key} not found`);
@@ -128,17 +124,22 @@ export const getHeadObject = async (headObjectParams: HeadObjectParams,
               }
             });
           }
+          logger.error('Error occurred while retrieving metadata for object',
+            {
+              Bucket: headObjectParams.Bucket, Key: headObjectParams.Key, error: err, errorStack: err.stack
+            });
           if (!err.message) {
             err.message = err.name;
           }
           reject(err);
         } else {
+          logger.debug(`Object metadata for Key ${headObjectParams.Key}`, data);
           resolve(data);
         }
       });
     });
   } catch (error) {
-    logger.error('Error occurred while retrieving metadata for object', {code: error.code, message: error.message, stack: error.stack});
+    logger.error('Error occurred while retrieving metadata for object', { code: error.code, message: error.message, stack: error.stack });
     const code = Number.isNaN(error.code) ? 500 : error.code;
     return {
       status: {
