@@ -25,7 +25,7 @@
     "@restorecommerce/logger": "^1.2.3",
     "@restorecommerce/rc-grpc-clients": "^4.0.1",
     "@restorecommerce/resource-base-interface": "^1.2.1",
-    "@restorecommerce/service-config": "^1.0.5",
+    "@restorecommerce/service-config": "^1.0.6",
     "aws-sdk": "^2.1413.0",
     "koa-multer": "^1.0.2",
     "multer-s3": "^3.0.1",
