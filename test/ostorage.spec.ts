@@ -758,15 +758,14 @@ describe('testing ostorage-srv with ACS disabled', () => {
                   {
                     id: "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
                     value: "urn:restorecommerce:acs:model:organization.Organization",
-                    attribute: []
-                  },
-                  {
-                    id: "urn:restorecommerce:acs:names:ownerInstance",
-                    value: "orgC",
-                    attribute: []
+                    attributes: [{
+                      id: 'urn:restorecommerce:acs:names:ownerInstance',
+                      value: 'orgC',
+                      attributes: []
+                    }]
                   }
                 ],
-                acl: [],
+                acls: [],
                 created: 0,
                 modified: 0,
                 modified_by: 'SYSTEM'

@@ -309,7 +309,7 @@ export class Service {
               objectMeta = JSON.parse(meta.Metadata.meta);
               if (meta.LastModified && objectMeta) {
                 this.logger.debug('List api LastModified', { lastModified: meta?.LastModified });
-                objectMeta.modified = new Date(meta.LastModified).getTime();
+                objectMeta.modified = new Date(meta.LastModified);
               }
             }
             let object = { object_name: objectName, url, meta: objectMeta };
@@ -572,7 +572,7 @@ export class Service {
       const downloadable = this.ossClient.getObject({ Bucket: bucket, Key: key }).createReadStream();
       if (headObject?.LastModified && metaObj) {
         this.logger.debug('GET api LastModified', { lastModified: headObject?.LastModified });
-        metaObj.modified = new Date(headObject.LastModified).getTime();
+        metaObj.modified = new Date(headObject.LastModified);
       }
       try {
         for await (const chunk of downloadable) {
@@ -699,7 +699,7 @@ export class Service {
       resource = this.createMetadata(resource, subject);
       const metaWithOwner = resource.meta;
       if (metaWithOwner) {
-        metaWithOwner.modified = new Date().getTime();
+        metaWithOwner.modified = new Date();
       }
       // created meta if it was not provided in request
       let acsResponse: DecisionResponse;
@@ -1049,7 +1049,7 @@ export class Service {
         let headObject: any = await getHeadObject(headObjectParams, this.ossClient, this.logger);
         if (headObject?.LastModified) {
           this.logger.debug('Copy api last modified', { lastModified: headObject?.LastModified });
-          meta.modified = new Date(headObject?.LastModified).getTime();
+          meta.modified = new Date(headObject?.LastModified);
         }
         if (headObject && headObject.status) {
           grpcResponse.responses.push({
