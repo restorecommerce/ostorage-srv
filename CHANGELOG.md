@@ -1,3 +1,9 @@
+## 1.0.1 (July 28th, 2023)
+
+- refactor owner and role association attributes
+- refactor for time stamp field and up deps
+- up deps
+
 ## 1.0.0 (June 20th, 2023)
 
 - updated dependencies and (change to major version due to migration to fully typed client, server from v0.3.3)
