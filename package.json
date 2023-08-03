@@ -26,7 +26,7 @@
     "@restorecommerce/rc-grpc-clients": "^5.0.1",
     "@restorecommerce/resource-base-interface": "^1.2.5",
     "@restorecommerce/service-config": "^1.0.6",
-    "aws-sdk": "^2.1424.0",
+    "aws-sdk": "^2.1428.0",
     "koa-multer": "^1.0.2",
     "multer-s3": "^3.0.1",
     "s3-upload-stream": "^1.0.7",
