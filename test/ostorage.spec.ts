@@ -52,8 +52,7 @@ let meta = {
     value: 'urn:restorecommerce:acs:model:organization.Organization',
     attributes: [{
       id: 'urn:restorecommerce:acs:names:ownerInstance',
-      value: 'orgC',
-      attributes: []
+      value: 'orgC'
     }]
   }]
 };
@@ -742,7 +741,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
             // what we receive
             const key = msg.key;
             const bucket = msg.bucket;
-            const metadata = unmarshallProtobufAny(msg.metadata);
+            const metadata = unmarshallProtobufAny(msg.metadata, logger);
 
             // // what we expect
             const responseMetadata = {
@@ -760,8 +759,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
                     value: "urn:restorecommerce:acs:model:organization.Organization",
                     attributes: [{
                       id: 'urn:restorecommerce:acs:names:ownerInstance',
-                      value: 'orgC',
-                      attributes: []
+                      value: 'orgC'
                     }]
                   }
                 ],
@@ -837,7 +835,7 @@ describe('testing ostorage-srv with ACS disabled', () => {
       let result = await ostorageService.list({
         bucket: 'invalid_bucket'
       });
-      should(result.responses).length(0);
+      should.not.exist(result.responses);
       result.operation_status.message.should.equal('The specified bucket is not valid.');
       sleep.sleep(3);
     });

@@ -5,6 +5,7 @@ import {
 import * as _ from 'lodash';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { createLogger } from '@restorecommerce/logger';
+import { Logger } from 'winston';
 import { createChannel, createClient } from '@restorecommerce/grpc-client';
 import { UserServiceDefinition, UserServiceClient } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import { HeadObjectParams } from './interfaces';
@@ -70,11 +71,11 @@ export async function checkAccessRequest(ctx: ACSClientContext, resource: Resour
   let subject = ctx.subject;
   // resolve subject id using findByToken api and update subject with id
   let dbSubject;
-  if (subject && subject.token) {
+  if (subject?.token) {
     const idsClient = await getUserServiceClient();
     if (idsClient) {
       dbSubject = await idsClient.findByToken({ token: subject.token });
-      if (dbSubject && dbSubject.payload && dbSubject.payload.id) {
+      if (dbSubject?.payload?.id) {
         subject.id = dbSubject.payload.id;
       }
     }
@@ -103,12 +104,16 @@ export const marshallProtobufAny = (msg: any): any => {
   };
 };
 
-export const unmarshallProtobufAny = (msg: any): any => {
-  return JSON.parse(msg.value.toString());
+export const unmarshallProtobufAny = (msg: any, logger: Logger): any => {
+  try {
+    return JSON.parse(msg.value.toString());
+  } catch (error) {
+    logger.error('Error unmarshalling data', { code: error.code, message: error.message, stack: error.stack });
+  }
 };
 
 export const getHeadObject = async (headObjectParams: HeadObjectParams,
-  ossClient: S3, logger: any): Promise<any> => {
+  ossClient: S3, logger: Logger): Promise<any> => {
   try {
     return new Promise((resolve, reject) => {
       ossClient.headObject(headObjectParams, (err: any, data) => {

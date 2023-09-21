@@ -1,3 +1,7 @@
+## 1.1.0 (September 21st, 2023)
+
+- update proto files (set all fields in protos to optionals)
+
 ## 1.0.1 (July 28th, 2023)
 
 - refactor owner and role association attributes

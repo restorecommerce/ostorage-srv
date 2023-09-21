@@ -183,15 +183,15 @@ export class Service {
     // if filter is provided return data based on filter
     if (requestFilter && requestFilter?.filters && !_.isEmpty(requestFilter?.filters)) {
       const filters = requestFilter.filters[0];
-      if (filters && filters.field == META_OWNER && filters.operation == EQ && filters.value) {
+      if (filters && filters?.field == META_OWNER && filters?.operation == EQ && filters?.value) {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
         if (object?.meta?.owners && _.isArray(object.meta.owners)) {
           for (let owner of object.meta.owners) {
-            if (owner.attributes.length > 0) {
+            if (owner?.attributes?.length > 0) {
               for (let ownerInstObj of owner.attributes) {
-                if (ownerInstObj.id === ownerInstanceURN) {
-                  metaOwnerVal = ownerInstObj.value;
+                if (ownerInstObj?.id === ownerInstanceURN) {
+                  metaOwnerVal = ownerInstObj?.value;
                 }
               }
             }
@@ -215,7 +215,7 @@ export class Service {
 
   async list(request: ListRequest, ctx: any): Promise<DeepPartial<ListResponse>> {
     let { bucket, filters, max_keys, prefix } = request;
-
+    this.logger.info(`Received a request to list objects on bucket ${bucket}`);
     let subject = request.subject;
     let acsResponse: PolicySetRQResponse; // WhatisAllowed check for Read operation
     try {
@@ -238,14 +238,18 @@ export class Service {
       return { operation_status: acsResponse.operation_status };
     }
     let customArgs;
-    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+    if (acsResponse?.custom_query_args?.length > 0) {
       customArgs = acsResponse.custom_query_args[0].custom_arguments;
     }
     const ownerIndictaorEntURN = this.cfg.get('authorization:urns:ownerIndicatoryEntity');
     const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
     let customArgsFilter, ownerValues, ownerIndicatorEntity;
-    if (customArgs && customArgs.value) {
-      customArgsFilter = JSON.parse(customArgs.value.toString());
+    if (customArgs?.value) {
+      try {
+        customArgsFilter = JSON.parse(customArgs.value.toString());
+      } catch (error) {
+        this.logger.error('Error parsing ACS response in list endpoint', { code: error.code, message: error.message, stack: error.stack });
+      }
       // applicable target owners instances
       ownerValues = customArgsFilter.instance;
       ownerIndicatorEntity = customArgsFilter.entity;
@@ -292,22 +296,26 @@ export class Service {
           };
         }
 
-        if (objList != null) {
+        if (objList != null && objList?.length > 0) {
           for (let eachObj of objList) {
             const headObjectParams = { Bucket: bucket, Key: eachObj.Key };
             let meta: any;
             meta = await getHeadObject(headObjectParams, this.ossClient, this.logger);
-            if (meta && meta.status) {
+            if (meta?.status) {
               return {
                 operation_status: { code: meta.status.code, message: meta.status.message }
               };
             }
             const url = `//${bucket}/${eachObj.Key}`;
-            const objectName = eachObj.Key;
+            const objectName = eachObj?.Key;
             let objectMeta;
             if (meta?.Metadata?.meta) {
-              objectMeta = JSON.parse(meta.Metadata.meta);
-              if (meta.LastModified && objectMeta) {
+              try {
+                objectMeta = JSON.parse(meta.Metadata.meta);
+              } catch (error) {
+                this.logger.error('Error parsing object meta data in list endpoint', { code: error.code, message: error.message, stack: error.stack });
+              }
+              if (meta?.LastModified && objectMeta) {
                 this.logger.debug('List api LastModified', { lastModified: meta?.LastModified });
                 objectMeta.modified = new Date(meta.LastModified);
               }
@@ -321,7 +329,7 @@ export class Service {
               if (objectMeta?.owners?.length > 0) {
                 for (let idVal of objectMeta.owners) {
                   if (idVal?.id === ownerIndictaorEntURN && idVal?.value === ownerIndicatorEntity && idVal?.attributes?.length > 0) {
-                    for (let ownInstObj of idVal.attributes) {
+                    for (let ownInstObj of idVal?.attributes) {
                       if (ownInstObj?.id === ownerInstanceURN && ownInstObj?.value && ownerValues.includes(ownInstObj.value)) {
                         this.filterObjects(filters, object, listResponse);
                       }
@@ -443,21 +451,25 @@ export class Service {
     let data = {};
     let meta_subject = { id: '' };
     // headObject.LastModified -> will give you lastModified field add this to meta in response
-    if (headObject?.Metadata) {
-      if (headObject?.Metadata?.meta) {
-        metaObj = JSON.parse(headObject.Metadata.meta);
-        // restore ACL from redis into metaObj
-        const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
-        if (acl) {
-          metaObj.acl = JSON.parse(acl);
+    try {
+      if (headObject?.Metadata) {
+        if (headObject?.Metadata?.meta) {
+          metaObj = JSON.parse(headObject.Metadata.meta);
+          // restore ACL from redis into metaObj
+          const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
+          if (acl) {
+            metaObj.acl = JSON.parse(acl);
+          }
+        }
+        if (headObject?.Metadata?.data) {
+          data = JSON.parse(headObject.Metadata.data);
+        }
+        if (headObject?.Metadata?.subject) {
+          meta_subject = JSON.parse(headObject.Metadata.subject);
         }
       }
-      if (headObject?.Metadata?.data) {
-        data = JSON.parse(headObject.Metadata.data);
-      }
-      if (headObject?.Metadata?.subject) {
-        meta_subject = JSON.parse(headObject.Metadata.subject);
-      }
+    } catch (error) {
+      this.logger.error('Error parsing Object meta data in get endpoint', { code: error.code, message: error.message, stack: error.stack });
     }
 
     // capture options from response headers
@@ -491,10 +503,9 @@ export class Service {
         }
       }
       let tags: Attribute[] = [];
-      if (objectTagging?.TagSet) {
+      if (objectTagging?.TagSet?.length > 0) {
         // transform received object to respect our own defined structure
-        let receivedTags = objectTagging.TagSet;
-        for (let tagObj of receivedTags) {
+        for (let tagObj of objectTagging.TagSet) {
           tags.push({
             id: tagObj.Key,
             value: tagObj.Value,
@@ -509,13 +520,13 @@ export class Service {
       // have no meta stored so first check if meta is defined
       // before making the ACS request
 
-      if (metaObj && metaObj.owners && metaObj.owners.length > 0) {
+      if (metaObj?.owners?.length > 0) {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
         for (let owner of metaObj.owners) {
-          if(owner.attributes.length > 0) {
+          if (owner?.attributes?.length > 0) {
             for (let ownerInstObj of owner.attributes) {
-              if(ownerInstObj.id === ownerInstanceURN) {
+              if (ownerInstObj.id === ownerInstanceURN) {
                 metaOwnerVal = ownerInstObj.value;
               }
             }
@@ -646,12 +657,11 @@ export class Service {
     if (targetScope) {
       ownerAttributes.push(
         {
-          id: urns.ownerIndicatoryEntity,
-          value: urns.organization,
+          id: urns?.ownerIndicatoryEntity,
+          value: urns?.organization,
           attributes: [{
-            id: urns.ownerInstance,
-            value: targetScope,
-            attributes: []
+            id: urns?.ownerInstance,
+            value: targetScope
           }]
         });
     }
@@ -659,7 +669,7 @@ export class Service {
     if (_.isEmpty(resource.meta)) {
       resource.meta = {};
     }
-    if (_.isEmpty(resource.meta.owners)) {
+    if (_.isEmpty(resource?.meta?.owners)) {
       resource.meta.owners = ownerAttributes;
     }
     return resource;
@@ -676,6 +686,7 @@ export class Service {
         options = item.options;
         subject = item.subject;
         meta = item.meta;
+        this.logger.info(`Received a request to put object ${key} on bucket ${bucket}`);
       }
     }
     readable.push(null);
@@ -738,11 +749,11 @@ export class Service {
         };
       }
       let subjectID = '';
-      if (subject && subject.token) {
+      if (subject?.token) {
         const dbSubject = await this.idsService.findByToken({ token: subject.token });
         subjectID = dbSubject?.payload?.id;
       }
-      if (subject && subject.id) {
+      if (subject?.id) {
         subjectID = subject.id;
       }
       const response = await this.storeObject(
@@ -775,8 +786,8 @@ export class Service {
     this.logger.info('Received a request to store Object:', { Key: key, Bucket: bucket });
     try {
       let data = {};
-      if (options && options.data) {
-        data = unmarshallProtobufAny(options.data);
+      if (options?.data) {
+        data = unmarshallProtobufAny(options.data, this.logger);
       }
       let subject = {};
       if (subjectID) {
@@ -792,7 +803,7 @@ export class Service {
       // inside the object metadata in S3, reason why we stringify the value fields.
       // When sending over Kafka we send metadata as google.protobuf.Any,
       // so we create a copy of the metaData object in unstringified state
-      if (meta && meta.acl && !_.isEmpty(meta.acl)) {
+      if (meta?.acl && !_.isEmpty(meta.acl)) {
         // store meta acl to redis
         await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
         delete meta.acl;
@@ -912,7 +923,7 @@ export class Service {
 
   async move(request: MoveRequestList, context?: any): Promise<DeepPartial<MoveResponseList>> {
     let { items, subject } = request;
-    this.logger.info('Received a request to Move Object', request);
+    this.logger.info('Received a request to Move Object', { items: request.items });
     let moveResponse: MoveResponseList = {
       responses: [],
       operation_status: { code: 0, message: '' }
@@ -937,16 +948,16 @@ export class Service {
       // No need for ACS check as both Read and Create access check are made in Copy operation
       const copyResponse = await this.copy({ items: [item as any], subject }, context);
       // if copyResponse is success for each of the object then delete the sourceObject
-      if (copyResponse?.operation_status?.code === 200) {
+      if (copyResponse?.operation_status?.code === 200 && copyResponse?.responses?.length > 0) {
         for (let response of copyResponse.responses) {
-          if (response && response?.status?.code === 200) {
+          if (response?.status?.code === 200) {
             // delete sourceObject Object
-            const payload = response.payload;
+            const payload = response?.payload;
             const deleteResponse = await this.delete({
               bucket: sourceBucketName, key: sourceKeyName, subject
             } as any, context);
             let deleteResponseCode, deleteResponseMessage;
-            if (deleteResponse && deleteResponse.status && deleteResponse.status[0]) {
+            if (deleteResponse?.status && deleteResponse.status[0]) {
               deleteResponseCode = deleteResponse.status[0].code;
               deleteResponseMessage = deleteResponse.status[0].message;
             }
@@ -978,9 +989,9 @@ export class Service {
             // fail status
             moveResponse.responses.push({
               status: {
-                id: response.status.id,
-                code: response.status.code,
-                message: response.status.message
+                id: response?.status?.id,
+                code: response?.status?.code,
+                message: response?.status?.message
               }
             });
           }
@@ -1004,17 +1015,16 @@ export class Service {
     let copyObjectResult;
     let subject = request.subject;
     let destinationSubjectScope; // scope for destination bucket
-    if (subject && subject.scope) {
+    if (subject?.scope) {
       destinationSubjectScope = subject.scope;
     }
-    this.logger.info('Received a request to Copy Object', request);
-    if (request && request.items) {
-      const itemsList = request.items;
-      for (const item of itemsList) {
-        bucket = item.bucket;
-        copySource = item.copySource;
-        key = item.key;
-        meta = item.meta;
+    this.logger.info('Received a request to Copy Object', { items: request.items });
+    if (request?.items?.length > 0) {
+      for (const item of request.items) {
+        bucket = item?.bucket;
+        copySource = item?.copySource;
+        key = item?.key;
+        meta = item?.meta;
         if (!meta) {
           (meta as any) = {};
         }
@@ -1051,7 +1061,7 @@ export class Service {
           this.logger.debug('Copy api last modified', { lastModified: headObject?.LastModified });
           meta.modified = new Date(headObject?.LastModified);
         }
-        if (headObject && headObject.status) {
+        if (headObject?.status) {
           grpcResponse.responses.push({
             status: {
               id: sourceKeyName,
@@ -1064,27 +1074,31 @@ export class Service {
         let metaObj;
         let data = {};
         let meta_subject = { id: '' };
-        if (headObject && headObject.Metadata) {
-          if (headObject.Metadata.meta) {
-            metaObj = JSON.parse(headObject.Metadata.meta);
-            // restore ACL from redis into metaObj
-            let redisKey;
-            if (sourceKeyName.startsWith('/')) {
-              redisKey = sourceKeyName.substring(1);
-            } else {
-              redisKey = sourceKeyName;
+        try {
+          if (headObject?.Metadata) {
+            if (headObject.Metadata.meta) {
+              metaObj = JSON.parse(headObject.Metadata.meta);
+              // restore ACL from redis into metaObj
+              let redisKey;
+              if (sourceKeyName.startsWith('/')) {
+                redisKey = sourceKeyName.substring(1);
+              } else {
+                redisKey = sourceKeyName;
+              }
+              const acl = await this.aclRedisClient.get(`${sourceBucketName}:${redisKey}`);
+              if (acl) {
+                metaObj.acl = JSON.parse(acl);
+              }
             }
-            const acl = await this.aclRedisClient.get(`${sourceBucketName}:${redisKey}`);
-            if (acl) {
-              metaObj.acl = JSON.parse(acl);
+            if (headObject.Metadata.data) {
+              data = JSON.parse(headObject.Metadata.data);
+            }
+            if (headObject.Metadata.subject) {
+              meta_subject = JSON.parse(headObject.Metadata.subject);
             }
           }
-          if (headObject.Metadata.data) {
-            data = JSON.parse(headObject.Metadata.data);
-          }
-          if (headObject.Metadata.subject) {
-            meta_subject = JSON.parse(headObject.Metadata.subject);
-          }
+        } catch (error) {
+          this.logger.error('Error parsing object meta data in copy endpoint', { code: error.code, message: error.message, stack: error.stack });
         }
         if (!subject) {
           subject = { id: '', unauthenticated: undefined, scope: '', token: '' };
@@ -1093,9 +1107,9 @@ export class Service {
           let metaOwnerVal;
           const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
           for (let owner of metaObj.owners) {
-            if(owner.attributes.length > 0) {
+            if (owner.attributes.length > 0) {
               for (let ownerInstObj of owner.attributes) {
-                if(ownerInstObj.id === ownerInstanceURN) {
+                if (ownerInstObj.id === ownerInstanceURN) {
                   metaOwnerVal = ownerInstObj.value;
                 }
               }
@@ -1211,35 +1225,35 @@ export class Service {
             subject: JSON.stringify({ id: subject.id })
           };
           // override data if it is provided
-          if (options.data) {
+          if (options?.data) {
             // params.Metadata.data = JSON.stringify(options.data);
-            params.Metadata.data = JSON.stringify(unmarshallProtobufAny(options.data));
+            params.Metadata.data = JSON.stringify(unmarshallProtobufAny(options.data, this.logger));
           } else {
             params.Metadata.data = JSON.stringify(data);
           }
 
           // 2. Add object metadata if provided
           // ContentEncoding
-          if (!_.isEmpty(options.encoding)) {
+          if (!_.isEmpty(options?.encoding)) {
             params.ContentEncoding = options.encoding;
           }
           // ContentType
-          if (!_.isEmpty(options.content_type)) {
+          if (!_.isEmpty(options?.content_type)) {
             params.ContentType = options.content_type;
           }
           // ContentLanguage
-          if (!_.isEmpty(options.content_language)) {
+          if (!_.isEmpty(options?.content_language)) {
             params.ContentLanguage = options.content_language;
           }
           // ContentDisposition
-          if (!_.isEmpty(options.content_disposition)) {
+          if (!_.isEmpty(options?.content_disposition)) {
             params.ContentDisposition = options.content_disposition;
           }
 
           // 3. Add Tagging if provided [ first convert array of tags to query parameters (it is required by S3) ]
           let TaggingQueryParams = '';
           let tagId: string, tagVal: string;
-          if (!_.isEmpty(options.tags)) {
+          if (!_.isEmpty(options?.tags)) {
             const tagsList = options.tags;
             for (const [i, v] of (tagsList as any).entries()) {
               tagId = v.id;
@@ -1301,12 +1315,11 @@ export class Service {
           if (_.isEmpty(meta.owners)) {
             const urns = this.cfg.get('authorization:urns');
             meta.owners = [{
-              id: urns.ownerIndicatoryEntity,
-              value: urns.organization,
+              id: urns?.ownerIndicatoryEntity,
+              value: urns?.organization,
               attributes: [{
-                id: urns.ownerInstance,
-                value: destinationSubjectScope,
-                attributes: []
+                id: urns?.ownerInstance,
+                value: destinationSubjectScope
               }]
             }];
           }
@@ -1460,7 +1473,7 @@ export class Service {
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
     let resources = { Bucket: bucket, Key: key };
     let headObject: any = await getHeadObject(resources, this.ossClient, this.logger);
-    if (headObject && headObject.status) {
+    if (headObject?.status) {
       return {
         status: [{ id: key, code: headObject.status.code, message: headObject.status.message }],
         operation_status: OPERATION_STATUS_SUCCESS
@@ -1470,21 +1483,25 @@ export class Service {
     let metaObj;
     let data = {};
     let meta_subject = { id: '' };
-    if (headObject && headObject.Metadata) {
-      if (headObject.Metadata.meta) {
-        metaObj = JSON.parse(headObject.Metadata.meta);
-        // restore ACL from redis into metaObj
-        const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
-        if (acl) {
-          metaObj.acl = JSON.parse(acl);
+    try {
+      if (headObject?.Metadata) {
+        if (headObject.Metadata.meta) {
+          metaObj = JSON.parse(headObject.Metadata.meta);
+          // restore ACL from redis into metaObj
+          const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
+          if (acl) {
+            metaObj.acl = JSON.parse(acl);
+          }
+        }
+        if (headObject.Metadata.data) {
+          data = JSON.parse(headObject.Metadata.data);
+        }
+        if (headObject.Metadata.subject) {
+          meta_subject = JSON.parse(headObject.Metadata.subject);
         }
       }
-      if (headObject.Metadata.data) {
-        data = JSON.parse(headObject.Metadata.data);
-      }
-      if (headObject.Metadata.subject) {
-        meta_subject = JSON.parse(headObject.Metadata.subject);
-      }
+    } catch (error) {
+      this.logger.error('Error parsing object meta data in delete endpoint', { code: error.code, message: error.message, stack: error.stack });
     }
     Object.assign(resources, { meta: metaObj, data, subject: { id: meta_subject.id } });
     let acsResponse: DecisionResponse;
