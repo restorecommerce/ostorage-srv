@@ -3,7 +3,6 @@ import { Worker } from '../lib/worker';
 import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import { createServiceConfig } from '@restorecommerce/service-config';
-import * as sleep from 'sleep';
 import * as fs from 'fs';
 import { bucketPolicySetRQ, permitCreateObjRule } from './utils';
 import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
@@ -337,7 +336,9 @@ describe('testing ostorage-srv with ACS enabled', () => {
           data.operation_status.message.should.equal('success');
         }
       }
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });
     });
     it('With valid subject scope should be able to list the object', async () => {
       let result = await ostorageService.list({ bucket: 'test', subject });
@@ -377,7 +378,9 @@ describe('testing ostorage-srv with ACS enabled', () => {
       should.exist(putResponse.operation_status);
       putResponse.operation_status.code.should.equal(200);
       putResponse.operation_status.message.should.equal('success');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
     it('With invalid subject scope should throw an error when reading object', async () => {
       // make sub id invalid so that data is not read from ACS cache
@@ -394,7 +397,9 @@ describe('testing ostorage-srv with ACS enabled', () => {
         data.response.status.code.should.equal(403);
         data.response.status.message.should.equal('Access not allowed for request with subject:invalid_subject_id_1, resource:test, action:READ, target_scope:orgC; the response was DENY');
       }
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
     it('With invalid subject scope should throw an error when listing object', async () => {
       // make sub id invalid so that data is not read from ACS cache
@@ -406,7 +411,9 @@ describe('testing ostorage-srv with ACS enabled', () => {
       should(result.responses).empty;
       result.operation_status.code.should.equal(403);
       result.operation_status.message.should.equal('Access not allowed for request with subject:invalid_subject_id_2, resource:test, action:READ, target_scope:orgD; the response was DENY');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
     it('With invalid subject scope should throw an error when deleting object', async () => {
       // make sub id invalid so that data is not read from ACS cache
@@ -420,7 +427,9 @@ describe('testing ostorage-srv with ACS enabled', () => {
       result.status[0].id.should.equal('config_acs_enabled.json');
       result.status[0].code.should.equal(403);
       result.status[0].message.should.equal('Access not allowed for request with subject:invalid_subject_id_3, resource:test, action:DELETE, target_scope:orgD; the response was DENY');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
     it('With invalid scope should result in an error when replacing the object', async () => {
       // make sub id invalid so that data is not read from ACS cache
@@ -453,7 +462,9 @@ describe('testing ostorage-srv with ACS enabled', () => {
       result.responses[0].status.id.should.equal('config_acs_enabled.json');
       result.responses[0].status.code.should.equal(403);
       result.responses[0].status.message.should.equal('Access not allowed for request with subject:invalid_subject_id_4, resource:test, action:READ, target_scope:orgC; the response was DENY');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
     it('With valid scope should replace the object', async () => {
       subject.id = 'admin_user_id';
@@ -497,7 +508,9 @@ describe('testing ostorage-srv with ACS enabled', () => {
       payload.meta.owners.should.deepEqual(meta.owners);
       payload.options.encoding.should.equal('gzip');
       payload.options.tags[0].id.should.equal('id_1');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
     it('With valid subject scope should delete the object', async () => {
       let result = await ostorageService.delete({
@@ -610,7 +623,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
         }
       }
 
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
 
       // move object - ä_ö_ü.json to moved.json
       let moveResponse = await ostorageService.move({
@@ -645,7 +660,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       should(listResponse2.responses).length(1);
       listResponse2.operation_status.code.should.equal(200);
       listResponse2.operation_status.message.should.equal('success');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
 
       // delete object moved.json from test2 bucket
       let delResponse = await ostorageService.delete({
@@ -654,7 +671,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       });
       delResponse.status[0].id.should.equal('moved.json');
       delResponse.status[0].code.should.equal(200);
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('Should store the data to storage server using request streaming', async () => {
@@ -700,7 +719,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
 
       // check length
       putResponse.response.payload.length.should.equal(29);
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('should get metadata of the Object', async () => {
@@ -729,7 +750,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
           data.operation_status.message.should.equal('success');
         }
       }
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('should get the Object with response streaming  and validate' +
@@ -815,7 +838,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
             data.operation_status.message.should.equal('success');
           }
         }
-        sleep.sleep(3);
+        await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
       });
 
     it('should list the Object', async () => {
@@ -828,7 +853,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       should(listResponse.responses).length(1);
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('should give an error for invalid bucket request', async () => {
@@ -837,7 +864,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       });
       should.not.exist(result.responses);
       result.operation_status.message.should.equal('The specified bucket is not valid.');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('Should replace the object', async () => {
@@ -882,7 +911,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       payload.meta.owners.should.deepEqual(meta.owners);
       payload.options.encoding.should.equal('gzip');
       payload.options.tags[0].id.should.equal('id_1');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('should upload another object and validate objectUploaded event and list both objects', async () => {
@@ -930,7 +961,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       should(listResponse.responses).length(2);
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('should list one object with prefix', async () => {
@@ -944,7 +977,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       should(listResponse.responses).length(1);
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('should list one object with max keys', async () => {
@@ -958,7 +993,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       should(listResponse.responses).length(1);
       listResponse.operation_status.code.should.equal(200);
       listResponse.operation_status.message.should.equal('success');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('should move objects from one bucket to another', async () => {
@@ -1002,7 +1039,9 @@ describe('testing ostorage-srv with ACS disabled', () => {
       should(listResponse2.responses).length(2);
       listResponse2.operation_status.code.should.equal(200);
       listResponse2.operation_status.message.should.equal('success');
-      sleep.sleep(3);
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });;
     });
 
     it('should delete the object', async () => {

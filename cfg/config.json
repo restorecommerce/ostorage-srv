@@ -52,15 +52,12 @@
     ]
   },
   "logger": {
-    "console": {
-      "handleExceptions": false,
-      "level": "error",
-      "colorize": true,
-      "prettyPrint": true
-    },
     "fieldOptions": {
-      "omitFields": [
-        "custom_arguments", "metadata"
+      "maskFields": [
+        "password",
+        "request.password",
+        "request.token",
+        "items.[0].password"
       ],
       "bufferFields": [
         {
@@ -69,6 +66,25 @@
         {
           "fieldPath": "messages.[0].metadata"
         }
+      ],
+      "omitFields": [
+        "context",
+        "custom_arguments",
+        "metadata",
+        "subject.token",
+        "token",
+        "tokens",
+        "items.[0].tokens",
+        "messages.[0].tokens",
+        "request.items.[0].tokens",
+        "response.payload.token",
+        "response.payload.tokens",
+        "request.subject.token",
+        "users.items.[0].payload.tokens",
+        "response.items.[0].payload.tokens",
+        "messages.[0].subject.token",
+        "decodedMsg.subject.token",
+        "request.subject.tokens"
       ]
     }
   },
