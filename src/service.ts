@@ -1107,7 +1107,7 @@ export class Service {
           let metaOwnerVal;
           const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
           for (let owner of metaObj.owners) {
-            if (owner.attributes.length > 0) {
+            if (owner?.attributes?.length > 0) {
               for (let ownerInstObj of owner.attributes) {
                 if (ownerInstObj.id === ownerInstanceURN) {
                   metaOwnerVal = ownerInstObj.value;
