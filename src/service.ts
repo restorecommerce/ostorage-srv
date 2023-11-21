@@ -535,7 +535,7 @@ export class Service {
         // restore scope for acs check from metaObj owners
         subject.scope = metaOwnerVal;
       } else {
-        this.logger.debug('Object metadata not found');
+        this.logger.debug('Object does not contain owners information');
       }
       // resource identifier is key here
       let resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };

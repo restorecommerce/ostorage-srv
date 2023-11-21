@@ -61,12 +61,14 @@ interface MethodWithOutput {
   output: any
 };
 
+let expires_in = new Date(); // set expires_in to +1 day
+expires_in.setDate(expires_in.getDate() + 1);
 // mainOrg -> orgA -> orgB -> orgC
 const acsSubject = {
   id: 'admin_user_id',
   scope: 'orgC',
   token: 'valid_token',
-  tokens: [{ token: 'valid_token', expires_in: 0 }],
+  tokens: [{ token: 'valid_token', expires_in }],
   role_associations: [
     {
       role: 'admin-r-id',
