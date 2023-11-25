@@ -672,6 +672,8 @@ export class Service {
     if (_.isEmpty(resource?.meta?.owners)) {
       resource.meta.owners = ownerAttributes;
     }
+    resource.meta.created_by = subject?.id;
+    resource.meta.modified_by = subject?.id;
     return resource;
   }
 

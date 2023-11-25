@@ -197,7 +197,7 @@
     "health": "grpc-health-v1"
   },
   "authorization": {
-    "service": "ostorage-srv",
+    "service": "acs-srv",
     "enabled": true,
     "enforce": true,
     "urns": {
