@@ -1,3 +1,7 @@
+### 1.2.3 (November 26th, 2023)
+
+- removed deprecated method in chassis-srv (collection.load)
+
 ## 1.2.2 (November 25th, 2023)
 
 - updated all dependencies (added created_by field to meta and client_id to tokens)
