@@ -1,17 +1,17 @@
 import should from 'should';
-import { Worker } from '../lib/worker';
+import { Worker } from '../src/worker.js';
 import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import { createServiceConfig } from '@restorecommerce/service-config';
-import * as fs from 'fs';
-import { bucketPolicySetRQ, permitCreateObjRule } from './utils';
+import * as fs from 'node:fs';
+import { bucketPolicySetRQ, permitCreateObjRule } from './utils.js';
 import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
 import * as proto_loader from '@grpc/proto-loader';
 import * as grpc from '@grpc/grpc-js';
-import { unmarshallProtobufAny } from "../lib/utils";
+import { unmarshallProtobufAny } from "../src/utils.js";
 import { Transform } from 'stream';
-import * as _ from 'lodash';
-import { ObjectServiceClient, ObjectServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
+import * as _ from 'lodash-es';
+import { ObjectServiceClient, ObjectServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
 import { createClient as RedisCreateClient, RedisClientType } from 'redis';
 
 let cfg: any;

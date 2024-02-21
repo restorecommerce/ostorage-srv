@@ -1,6 +1,6 @@
 import * as chassis from '@restorecommerce/chassis-srv';
 import { updateConfig } from '@restorecommerce/acs-client';
-import { Unimplemented } from '@restorecommerce/chassis-srv/lib/microservice/errors';
+import { Unimplemented } from '@restorecommerce/chassis-srv/lib/microservice/errors.js';
 import { RedisClientType } from 'redis';
 
 export class OStorageCommandInterface extends chassis.CommandInterface {

@@ -2,15 +2,15 @@ import {
   AuthZAction, PolicySetRQResponse, accessRequest,
   DecisionResponse, Operation, ACSClientContext, Resource
 } from '@restorecommerce/acs-client';
-import * as _ from 'lodash';
+import * as _ from 'lodash-es';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { createLogger } from '@restorecommerce/logger';
 import { Logger } from 'winston';
 import { createChannel, createClient } from '@restorecommerce/grpc-client';
-import { UserServiceDefinition, UserServiceClient } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
-import { HeadObjectParams } from './interfaces';
+import { UserServiceDefinition, UserServiceClient } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
+import { HeadObjectParams } from './interfaces.js';
 import { S3 } from 'aws-sdk';
-import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 
 export interface HierarchicalScope {
   id: string;
@@ -86,7 +86,7 @@ export async function checkAccessRequest(ctx: ACSClientContext, resource: Resour
 
   let result: DecisionResponse | PolicySetRQResponse;
   try {
-    result = await accessRequest(subject, resource, action, ctx, operation);
+    result = await accessRequest(subject, resource, action, ctx, { operation });
   } catch (err) {
     return {
       decision: Response_Decision.DENY,

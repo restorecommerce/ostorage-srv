@@ -1,29 +1,30 @@
-import * as _ from 'lodash';
-import * as aws from 'aws-sdk';
-import { Readable } from 'stream';
+import * as _ from 'lodash-es';
+import pkg from 'aws-sdk';
+import { Readable } from 'node:stream';
 import { errors } from '@restorecommerce/chassis-srv';
 import {
   checkAccessRequest, unmarshallProtobufAny,
   marshallProtobufAny, getHeadObject
-} from './utils';
+} from './utils.js';
 import {
   AuthZAction, ACSAuthZ, PolicySetRQResponse,
   updateConfig, DecisionResponse, Operation
 } from '@restorecommerce/acs-client';
-import { CopyObjectParams } from './interfaces';
+import { CopyObjectParams } from './interfaces.js';
 import { RedisClientType } from 'redis';
-import { ListObjectsV2Request } from 'aws-sdk/clients/s3';
+import { ListObjectsV2Request } from 'aws-sdk/clients/s3.js';
 import {
   ServerStreamingMethodResult, DeepPartial, Object as PutObject, ObjectResponse, ListRequest,
   ListResponse, GetRequest, Options, PutResponse, MoveRequestList,
   MoveResponseList, CopyResponseList, CopyRequestList, CopyResponseItem, DeleteRequest
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
-import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
-import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/attribute';
-import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
-import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
-import { DeleteResponse } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
+import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
+import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/attribute.js';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
+import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta.js';
+import { DeleteResponse } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 
+const { S3 } = pkg;
 const META_OWNER = 'meta.owners';
 const EQ = 'eq';
 
@@ -33,7 +34,7 @@ const OPERATION_STATUS_SUCCESS = {
 };
 
 export class Service {
-  ossClient: aws.S3; // object storage frameworks are S3-compatible
+  ossClient: S3; // object storage frameworks are S3-compatible
   buckets: string[];
   bucketsLifecycleConfigs?: any;
   authZ: ACSAuthZ;
@@ -44,7 +45,7 @@ export class Service {
 
   constructor(cfg: any, private logger: any, private topics: any, authZ: ACSAuthZ,
     idsService: any, aclRedisClient: RedisClientType<any, any>) {
-    this.ossClient = new aws.S3(cfg.get('s3:client'));
+    this.ossClient = new S3(cfg.get('s3:client'));
     this.buckets = cfg.get('s3:buckets') || [];
     this.bucketsLifecycleConfigs = cfg.get('s3.bucketsLifecycleConfigs');
     this.authZ = authZ;
@@ -822,7 +823,7 @@ export class Service {
       length = readable.readableLength;
 
       // convert array of tags to query parameters
-      // required by AWS.S3
+      // required by AWS S3
       let TaggingQueryParams = '';
       let tagId: string, tagVal: string;
       if (options && options.tags) {

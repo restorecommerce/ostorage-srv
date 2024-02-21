@@ -1,23 +1,23 @@
 import { createServiceConfig } from '@restorecommerce/service-config';
-import * as _ from 'lodash';
+import * as _ from 'lodash-es';
 import { Events, registerProtoMeta, Topic } from '@restorecommerce/kafka-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
-import { Service } from './service';
-import { OStorageCommandInterface } from './commandInterface';
+import { Service } from './service.js';
+import { OStorageCommandInterface } from './commandInterface.js';
 import { createClient, RedisClientType } from 'redis';
 import { initAuthZ, ACSAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import { Logger } from 'winston';
 import { createChannel, createClient as createGrpcClient } from '@restorecommerce/grpc-client';
-import { ObjectServiceDefinition, protoMetadata as ostorageMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage';
-import { CommandInterfaceServiceDefinition, protoMetadata as commandInterfaceMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface';
-import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health';
+import { ObjectServiceDefinition, protoMetadata as ostorageMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
+import { CommandInterfaceServiceDefinition, protoMetadata as commandInterfaceMeta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface.js';
+import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health.js';
 import {
   protoMetadata as reflectionMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/reflection/v1alpha/reflection';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/reflection/v1alpha/reflection.js';
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
-import { UserServiceClient, UserServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
-import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc';
+import { UserServiceClient, UserServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
+import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc/index.js';
 
 // register for kafka events
 registerProtoMeta(ostorageMeta, commandInterfaceMeta, reflectionMeta);
@@ -159,20 +159,4 @@ export class Worker {
     await this.events.stop();
     await this.offsetStore.stop();
   }
-}
-
-if (require.main === module) {
-  const worker = new Worker();
-  const logger = worker.logger;
-  worker.start().then().catch((err) => {
-    logger.error('startup error', err);
-    process.exit(1);
-  });
-
-  process.on('SIGINT', () => {
-    worker.stop().then().catch((err) => {
-      logger.error('shutdown error', err);
-      process.exit(1);
-    });
-  });
 }
