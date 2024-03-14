@@ -86,7 +86,7 @@ export async function checkAccessRequest(ctx: ACSClientContext, resource: Resour
 
   let result: DecisionResponse | PolicySetRQResponse;
   try {
-    result = await accessRequest(subject, resource, action, ctx, { operation, roleScopingEntityURN: cfg?.get('authorization:urns:organization') });
+    result = await accessRequest(subject, resource, action, ctx, { operation, roleScopingEntityURN: cfg?.get('authorization:urns:roleScopingEntityURN') });
   } catch (err) {
     return {
       decision: Response_Decision.DENY,
