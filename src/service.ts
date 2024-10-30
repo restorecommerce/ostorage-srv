@@ -586,6 +586,11 @@ export class Service {
         this.logger.debug('GET api LastModified', { lastModified: headObject?.LastModified });
         metaObj.modified = new Date(headObject.LastModified);
       }
+
+      if (metaObj?.created && typeof metaObj.created === 'string') {
+        metaObj.created = new Date(metaObj.created);
+      }
+
       try {
         for await (const chunk of downloadable) {
           yield {
