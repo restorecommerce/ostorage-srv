@@ -57,7 +57,7 @@ export class Service {
 
   async start(): Promise<void> {
     // Create buckets as defined in config.json
-    for (let bucket of this.buckets) {
+    for (const bucket of this.buckets) {
       await new Promise((resolve, reject) => {
         this.ossClient.createBucket({
           Bucket: bucket
@@ -74,13 +74,13 @@ export class Service {
 
     // Bucket lifecycle configuration
     // get a list of all the bucket names for which rules exist
-    let existingBucketRules = [];
+    const existingBucketRules = [];
     // bucket names for which the existing rules should be deleted
-    let deleteBucketRules = [];
+    const deleteBucketRules = [];
     // bucket names for the rules in configuration
-    let updateBucketRules = [];
+    const updateBucketRules = [];
 
-    for (let bucket of this.buckets) {
+    for (const bucket of this.buckets) {
       await new Promise((resolve, reject) => {
         this.ossClient.getBucketLifecycleConfiguration({ Bucket: bucket }, (err, data) => {
           if (err) {
@@ -112,18 +112,18 @@ export class Service {
     // Check if lifecycle configuration is given
     if (this.bucketsLifecycleConfigs) {
       // check if there are any bucket rules to be removed
-      for (let bucketLifecycleConfiguration of this.bucketsLifecycleConfigs) {
+      for (const bucketLifecycleConfiguration of this.bucketsLifecycleConfigs) {
         updateBucketRules.push(bucketLifecycleConfiguration.Bucket);
       }
 
-      for (let existingBucketRule of existingBucketRules) {
+      for (const existingBucketRule of existingBucketRules) {
         if (!updateBucketRules.includes(existingBucketRule)) {
           deleteBucketRules.push(existingBucketRule);
         }
       }
 
       // delete rules
-      for (let bucket of deleteBucketRules) {
+      for (const bucket of deleteBucketRules) {
         await new Promise((resolve, reject) => {
           this.ossClient.deleteBucketLifecycle({ Bucket: bucket }, (err, data) => {
             if (err) { // an error occurred
@@ -141,8 +141,8 @@ export class Service {
       }
 
       // Upsert rules
-      for (let bucketLifecycleParams of this.bucketsLifecycleConfigs) {
-        let bucketName = bucketLifecycleParams.Bucket;
+      for (const bucketLifecycleParams of this.bucketsLifecycleConfigs) {
+        const bucketName = bucketLifecycleParams.Bucket;
         await new Promise((resolve, reject) => {
           this.ossClient.putBucketLifecycleConfiguration(bucketLifecycleParams, (err, data) => {
             if (err) { // an error occurred
@@ -161,7 +161,7 @@ export class Service {
     } else {
       // Check old rules if they exist in all the buckets and delete them.
       // This is for use case if the configurations were added previously and all of them are removed now.
-      for (let existingBucketRule of existingBucketRules) {
+      for (const existingBucketRule of existingBucketRules) {
         await new Promise((resolve, reject) => {
           this.ossClient.deleteBucketLifecycle({ Bucket: existingBucketRule }, (err, data) => {
             if (err) { // an error occurred
@@ -188,9 +188,9 @@ export class Service {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
         if (object?.meta?.owners && _.isArray(object.meta.owners)) {
-          for (let owner of object.meta.owners) {
+          for (const owner of object.meta.owners) {
             if (owner?.attributes?.length > 0) {
-              for (let ownerInstObj of owner.attributes) {
+              for (const ownerInstObj of owner.attributes) {
                 if (ownerInstObj?.id === ownerInstanceURN) {
                   metaOwnerVal = ownerInstObj?.value;
                 }
@@ -215,9 +215,9 @@ export class Service {
   }
 
   async list(request: ListRequest, ctx: any): Promise<DeepPartial<ListResponse>> {
-    let { bucket, filters, max_keys, prefix } = request;
+    const { bucket, filters, max_keys, prefix } = request;
     this.logger.info(`Received a request to list objects on bucket ${bucket}`);
-    let subject = request.subject;
+    const subject = request.subject;
     let acsResponse: PolicySetRQResponse; // WhatisAllowed check for Read operation
     try {
       if (!ctx) { ctx = {}; };
@@ -262,14 +262,14 @@ export class Service {
     } else {
       buckets = this.buckets;
     }
-    let listResponse: ListResponse = {
+    const listResponse: ListResponse = {
       responses: [],
       operation_status: { code: 0, message: '' }
     };
 
     for (const bucket of buckets) {
       if (bucket != null) {
-        let request: ListObjectsV2Request = { Bucket: bucket };
+        const request: ListObjectsV2Request = { Bucket: bucket };
         if (max_keys) {
           request.MaxKeys = max_keys;
         }
@@ -298,10 +298,9 @@ export class Service {
         }
 
         if (objList != null && objList?.length > 0) {
-          for (let eachObj of objList) {
+          for (const eachObj of objList) {
             const headObjectParams = { Bucket: bucket, Key: eachObj.Key };
-            let meta: any;
-            meta = await getHeadObject(headObjectParams, this.ossClient, this.logger);
+            const meta = await getHeadObject(headObjectParams, this.ossClient, this.logger);
             if (meta?.status) {
               return {
                 operation_status: { code: meta.status.code, message: meta.status.message }
@@ -321,16 +320,16 @@ export class Service {
                 objectMeta.modified = new Date(meta.LastModified);
               }
             }
-            let object = { object_name: objectName, url, meta: objectMeta };
+            const object = { object_name: objectName, url, meta: objectMeta };
             // authorization filter check
             if (this.cfg.get('authorization:enabled')) {
               // if target objects owners instance `ownerInst` is contained in the
               // list of applicable `ownerValues` returned from ACS ie. ownerValues.includes(ownerInst)
               // then its considred a match for further filtering based on filter field if it exists
               if (objectMeta?.owners?.length > 0) {
-                for (let idVal of objectMeta.owners) {
-                  if (idVal?.id === ownerIndictaorEntURN && idVal?.value === ownerIndicatorEntity && idVal?.attributes?.length > 0) {
-                    for (let ownInstObj of idVal?.attributes) {
+                for (const idVal of objectMeta.owners) {
+                  if (idVal && idVal.id === ownerIndictaorEntURN && idVal.value === ownerIndicatorEntity && idVal.attributes?.length > 0) {
+                    for (const ownInstObj of idVal.attributes) {
                       if (ownInstObj?.id === ownerInstanceURN && ownInstObj?.value && ownerValues.includes(ownInstObj.value)) {
                         this.filterObjects(filters, object, listResponse);
                       }
@@ -395,7 +394,7 @@ export class Service {
 
     // get metadata of the object stored in the S3 object storage
     const params = { Bucket: bucket, Key: key };
-    let headObject: any = await getHeadObject(params, this.ossClient, this.logger);
+    const headObject: any = await getHeadObject(params, this.ossClient, this.logger);
     if (headObject?.status) {
       yield {
         response: {
@@ -503,10 +502,10 @@ export class Service {
           version = headObject['x-amz-version-id'];
         }
       }
-      let tags: Attribute[] = [];
+      const tags: Attribute[] = [];
       if (objectTagging?.TagSet?.length > 0) {
         // transform received object to respect our own defined structure
-        for (let tagObj of objectTagging.TagSet) {
+        for (const tagObj of objectTagging.TagSet) {
           tags.push({
             id: tagObj.Key,
             value: tagObj.Value,
@@ -524,9 +523,9 @@ export class Service {
       if (metaObj?.owners?.length > 0) {
         let metaOwnerVal;
         const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-        for (let owner of metaObj.owners) {
+        for (const owner of metaObj.owners) {
           if (owner?.attributes?.length > 0) {
-            for (let ownerInstObj of owner.attributes) {
+            for (const ownerInstObj of owner.attributes) {
               if (ownerInstObj.id === ownerInstanceURN) {
                 metaOwnerVal = ownerInstObj.value;
               }
@@ -539,7 +538,7 @@ export class Service {
         this.logger.debug('Object does not contain owners information');
       }
       // resource identifier is key here
-      let resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
+      const resource = { id: key, bucket, meta: metaObj, data, subject: { id: meta_subject.id } };
       let acsResponse: DecisionResponse; // isAllowed check for Read operation
       try {
         if (!ctx) { ctx = {}; };
@@ -622,7 +621,7 @@ export class Service {
       this.logger.info(`S3 read stream ended and Object ${key} download from ${bucket} bucket successful`);
       // emit objectDownloadRequested event
       // collect all metadata
-      let allMetadata = {
+      const allMetadata = {
         optionsObj,
         metaObj,
         data,
@@ -658,7 +657,7 @@ export class Service {
     if (!_.isEmpty(subject)) {
       targetScope = subject.scope;
     }
-    let ownerAttributes: Attribute[] = [];
+    const ownerAttributes: Attribute[] = [];
     const urns = this.cfg.get('authorization:urns');
     if (targetScope) {
       ownerAttributes.push(
@@ -802,7 +801,7 @@ export class Service {
         subject = { id: subjectID };
       }
 
-      let metaDataCopy = {
+      const metaDataCopy = {
         meta,
         data,
         subject
@@ -817,22 +816,21 @@ export class Service {
         delete meta.acl;
       }
 
-      let metaData = {
+      const metaData = {
         meta: JSON.stringify(meta),
         data: JSON.stringify(data),
         subject: JSON.stringify(subject)
       };
 
       // get object length
-      let length: number;
-      length = readable.readableLength;
+      const length = readable.readableLength;
 
       // convert array of tags to query parameters
       // required by AWS S3
       let TaggingQueryParams = '';
       let tagId: string, tagVal: string;
       if (options && options.tags) {
-        let tags = options.tags;
+        const tags = options.tags;
         for (const [i, v] of (tags as any).entries()) {
           tagId = v.id;
           tagVal = v.value;
@@ -901,7 +899,7 @@ export class Service {
           const uploadedUrl = result?.Location;
           bucketWithKey = uploadedUrl?.substring(uploadedUrl?.indexOf(bucket));
         }
-        let url = bucketWithKey ? `//${bucketWithKey}` : `//${bucket}/${key}`;
+        const url = bucketWithKey ? `//${bucketWithKey}` : `//${bucket}/${key}`;
         const tags = options && options.tags;
         this.logger.info(`Object ${key} uploaded successfully to bucket ${bucket}`, { url });
         return {
@@ -930,9 +928,9 @@ export class Service {
   }
 
   async move(request: MoveRequestList, context?: any): Promise<DeepPartial<MoveResponseList>> {
-    let { items, subject } = request;
+    const { items, subject } = request;
     this.logger.info('Received a request to Move Object', { items: request.items });
-    let moveResponse: MoveResponseList = {
+    const moveResponse: MoveResponseList = {
       responses: [],
       operation_status: { code: 0, message: '' }
     };
@@ -941,7 +939,7 @@ export class Service {
       return moveResponse;
     }
 
-    for (let item of items) {
+    for (const item of items) {
       let sourceBucketName, sourceKeyName;
       if (item.sourceObject) {
         (item as any).copySource = item.sourceObject;
@@ -957,7 +955,7 @@ export class Service {
       const copyResponse = await this.copy({ items: [item as any], subject }, context);
       // if copyResponse is success for each of the object then delete the sourceObject
       if (copyResponse?.operation_status?.code === 200 && copyResponse?.responses?.length > 0) {
-        for (let response of copyResponse.responses) {
+        for (const response of copyResponse.responses) {
           if (response?.status?.code === 200) {
             // delete sourceObject Object
             const payload = response?.payload;
@@ -1019,7 +1017,7 @@ export class Service {
     let key: string;
     let meta: Meta;
     let options: Options;
-    let grpcResponse: CopyResponseList = { responses: [], operation_status: { code: 0, message: '' } };
+    const grpcResponse: CopyResponseList = { responses: [], operation_status: { code: 0, message: '' } };
     let copyObjectResult;
     let subject = request.subject;
     let destinationSubjectScope; // scope for destination bucket
@@ -1057,14 +1055,14 @@ export class Service {
         const sourceBucketName = copySourceStr.substring(0, copySourceStr.indexOf('/'));
         const sourceKeyName = copySourceStr.substring(copySourceStr.indexOf('/') + 1, copySourceStr.length);
         // Start - Compose the copyObject params
-        let params: CopyObjectParams = {
+        const params: CopyObjectParams = {
           Bucket: bucket,
           CopySource: copySource,
           Key: key
         };
 
         const headObjectParams = { Bucket: sourceBucketName, Key: sourceKeyName };
-        let headObject: any = await getHeadObject(headObjectParams, this.ossClient, this.logger);
+        const headObject: any = await getHeadObject(headObjectParams, this.ossClient, this.logger);
         if (headObject?.LastModified) {
           this.logger.debug('Copy api last modified', { lastModified: headObject?.LastModified });
           meta.modified = new Date(headObject?.LastModified);
@@ -1114,9 +1112,9 @@ export class Service {
         if (metaObj?.owners?.length > 0) {
           let metaOwnerVal;
           const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
-          for (let owner of metaObj.owners) {
+          for (const owner of metaObj.owners) {
             if (owner?.attributes?.length > 0) {
-              for (let ownerInstObj of owner.attributes) {
+              for (const ownerInstObj of owner.attributes) {
                 if (ownerInstObj.id === ownerInstanceURN) {
                   metaOwnerVal = ownerInstObj.value;
                 }
@@ -1128,7 +1126,7 @@ export class Service {
         }
 
         // ACS read request check for source Key READ and CREATE action request check for destination Bucket
-        let resource = { id: key, key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
+        const resource = { id: key, key, sourceBucketName, meta: metaObj, data, subject: { id: meta_subject.id } };
         let acsResponse: DecisionResponse; // isAllowed check for Read operation
         try {
           if (!ctx) { ctx = {}; };
@@ -1166,13 +1164,13 @@ export class Service {
         if (metaObj == undefined) {
           metaObj = { acls: [] };
         }
-        let sourceACL = metaObj.acls;
+        const sourceACL = metaObj.acls;
         metaObj.acl = meta?.acls ? meta.acls : [];
         resource.meta = metaObj;
         if (!ctx) { ctx = {}; };
         ctx.subject = subject;
         ctx.resources = resource;
-        let writeAccessResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: resource.key }],
+        const writeAccessResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: resource.key }],
           AuthZAction.CREATE, Operation.isAllowed);
         if (writeAccessResponse.decision != Response_Decision.PERMIT) {
           grpcResponse.responses.push({
@@ -1191,7 +1189,7 @@ export class Service {
         if (options) {
           optionKeys = Object.keys(options);
         }
-        for (let optKey of optionKeys) {
+        for (const optKey of optionKeys) {
           if (!_.isEmpty(options[optKey])) {
             optionsExist = true;
             break;
@@ -1438,7 +1436,7 @@ export class Service {
         }
 
         if (copyObjectResult) {
-          let copiedObject: CopyResponseItem = {
+          const copiedObject: CopyResponseItem = {
             bucket,
             copySource,
             key,
@@ -1470,7 +1468,7 @@ export class Service {
 
   async delete(request: DeleteRequest, ctx: any): Promise<DeepPartial<DeleteResponse>> {
     const { bucket, key } = request;
-    let subject = request.subject;
+    const subject = request.subject;
     if (!_.includes(this.buckets, bucket)) {
       return {
         status: [{ id: key, code: 400, message: `Invalid bucket name ${bucket}` }],
@@ -1479,8 +1477,8 @@ export class Service {
     }
 
     this.logger.info(`Received a request to delete object ${key} on bucket ${bucket}`);
-    let resources = { Bucket: bucket, Key: key };
-    let headObject: any = await getHeadObject(resources, this.ossClient, this.logger);
+    const resources = { Bucket: bucket, Key: key };
+    const headObject: any = await getHeadObject(resources, this.ossClient, this.logger);
     if (headObject?.status) {
       return {
         status: [{ id: key, code: headObject.status.code, message: headObject.status.message }],

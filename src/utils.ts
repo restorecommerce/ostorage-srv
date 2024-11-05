@@ -64,10 +64,9 @@ export async function checkAccessRequest(ctx: ACSClientContext, resource: Resour
  * @param action The action to perform
  * @param operation The operation to invoke either isAllowed or whatIsAllowed
  */
-/* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction,
   operation: Operation): Promise<DecisionResponse | PolicySetRQResponse> {
-  let subject = ctx.subject;
+  const subject = ctx.subject;
   // resolve subject id using findByToken api and update subject with id
   let dbSubject;
   if (subject?.token) {
