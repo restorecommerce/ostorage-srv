@@ -447,7 +447,7 @@ export class Service {
       return;
     }
     // capture meta data from response message
-    let metaObj;
+    let metaObj: Meta;
     let data = {};
     let meta_subject = { id: '' };
     // headObject.LastModified -> will give you lastModified field add this to meta in response
@@ -458,7 +458,7 @@ export class Service {
           // restore ACL from redis into metaObj
           const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
           if (acl) {
-            metaObj.acl = JSON.parse(acl);
+            metaObj.acls = JSON.parse(acl);
           }
         }
         if (headObject?.Metadata?.data) {
@@ -788,7 +788,7 @@ export class Service {
     }
   }
 
-  private async storeObject(key: string, bucket: string, readable: Readable, meta: any,
+  private async storeObject(key: string, bucket: string, readable: Readable, meta: Meta,
     options: Options, subjectID: string): Promise<PutResponse> {
     this.logger.info('Received a request to store Object:', { Key: key, Bucket: bucket });
     try {
@@ -810,10 +810,10 @@ export class Service {
       // inside the object metadata in S3, reason why we stringify the value fields.
       // When sending over Kafka we send metadata as google.protobuf.Any,
       // so we create a copy of the metaData object in unstringified state
-      if (meta?.acl && !_.isEmpty(meta.acl)) {
+      if (meta?.acls && !_.isEmpty(meta.acls)) {
         // store meta acl to redis
-        await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acl));
-        delete meta.acl;
+        await this.aclRedisClient.set(`${bucket}:${key}`, JSON.stringify(meta.acls));
+        delete meta.acls;
       }
 
       const metaData = {
@@ -1077,7 +1077,7 @@ export class Service {
           });
           continue;
         }
-        let metaObj;
+        let metaObj: Meta;
         let data = {};
         let meta_subject = { id: '' };
         try {
@@ -1093,7 +1093,7 @@ export class Service {
               }
               const acl = await this.aclRedisClient.get(`${sourceBucketName}:${redisKey}`);
               if (acl) {
-                metaObj.acl = JSON.parse(acl);
+                metaObj.acls = JSON.parse(acl);
               }
             }
             if (headObject.Metadata.data) {
@@ -1165,7 +1165,7 @@ export class Service {
           metaObj = { acls: [] };
         }
         const sourceACL = metaObj.acls;
-        metaObj.acl = meta?.acls ? meta.acls : [];
+        metaObj.acls = meta?.acls ? meta.acls : [];
         resource.meta = metaObj;
         if (!ctx) { ctx = {}; };
         ctx.subject = subject;
@@ -1486,7 +1486,7 @@ export class Service {
       };
     }
     // capture meta data from response message
-    let metaObj;
+    let metaObj: Meta;
     let data = {};
     let meta_subject = { id: '' };
     try {
@@ -1496,7 +1496,7 @@ export class Service {
           // restore ACL from redis into metaObj
           const acl = await this.aclRedisClient.get(`${bucket}:${key}`);
           if (acl) {
-            metaObj.acl = JSON.parse(acl);
+            metaObj.acls = JSON.parse(acl);
           }
         }
         if (headObject.Metadata.data) {
