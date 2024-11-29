@@ -23,6 +23,7 @@ import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-serve
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta.js';
 import { DeleteResponse } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
+import { Status } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status.js';
 
 const { S3 } = pkg;
 const META_OWNER = 'meta.owners';
@@ -226,12 +227,12 @@ export class Service {
       ctx.resources = [];
       acsResponse = await checkAccessRequest(ctx, [{ resource: bucket }], AuthZAction.READ,
         Operation.whatIsAllowed) as PolicySetRQResponse;
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for list operation', err);
       return {
         operation_status: {
-          code: err.code,
-          message: err.message
+          code: Number.isInteger(err?.code) ? err.code : 500,
+          message: err?.message
         }
       };
     }
@@ -291,9 +292,12 @@ export class Service {
               }
             });
           });
-        } catch (err) {
+        } catch (err: any) {
           return {
-            operation_status: { code: err.code, message: err.message }
+            operation_status: {
+              code: Number.isInteger(err?.code) ? err.code : 500,
+              message: err?.message
+            }
           };
         }
 
@@ -401,7 +405,7 @@ export class Service {
           payload: null,
           status: {
             id: key,
-            code: headObject.status.code,
+            code: Number.isInteger(headObject?.status?.code) ? headObject.status.code : 500,
             message: headObject.status.message
           }
         },
@@ -431,15 +435,15 @@ export class Service {
           }
         });
       });
-    } catch (err) {
+    } catch (err: any) {
       this.logger.info('No object tagging found for key:', { Key: key });
       yield {
         response: {
           payload: null,
           status: {
             id: key,
-            code: err.code,
-            message: err.message
+            code: Number.isInteger(err?.code) ? err.code : 500,
+            message: err?.message
           }
         },
         operation_status: OPERATION_STATUS_SUCCESS
@@ -548,7 +552,7 @@ export class Service {
         ctx.resources = resource;
         acsResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: key }], AuthZAction.READ,
           Operation.isAllowed);
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error('Error occurred requesting access-control-srv for get operation', err);
         yield {
           response: {
@@ -603,7 +607,7 @@ export class Service {
             }
           };
         }
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error('Error piping streamable response', { err: err.messsage });
         const code = (err as any).code || 500;
         yield {
@@ -612,7 +616,7 @@ export class Service {
             status: {
               id: key,
               code,
-              message: err.message
+              message: err?.message
             }
           },
           operation_status: OPERATION_STATUS_SUCCESS
@@ -728,15 +732,15 @@ export class Service {
         // target entity for ACS is bucket name here
         acsResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: key }], AuthZAction.CREATE,
           Operation.isAllowed) as DecisionResponse;
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error('Error occurred requesting access-control-srv for put operation', err);
         return {
           response: {
             payload: null,
             status: {
               id: key,
-              code: err.code || 500,
-              message: err.message
+              code: Number.isInteger(err?.code) ? err.code : 500,
+              message: err?.message
             }
           },
           operation_status: OPERATION_STATUS_SUCCESS
@@ -869,7 +873,7 @@ export class Service {
                 status: {
                   id: key,
                   code: (err as any).code || 500,
-                  message: err.message
+                  message: err?.message
                 }
               },
               operation_status: OPERATION_STATUS_SUCCESS
@@ -915,12 +919,12 @@ export class Service {
             Key: key, Bucket: bucket
           });
       }
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error storing object', err);
       return {
         response: {
           payload: null,
-          status: { id: key, code: err.code, message: err.message }
+          status: { id: key, code: Number.isInteger(err?.code) ? err.code : 500, message: err?.message }
         },
         operation_status: OPERATION_STATUS_SUCCESS
       };
@@ -1071,7 +1075,7 @@ export class Service {
           grpcResponse.responses.push({
             status: {
               id: sourceKeyName,
-              code: headObject.status.code,
+              code: Number.isInteger(headObject?.status?.code) ? headObject.status.code : 500,
               message: headObject.status.message
             }
           });
@@ -1135,13 +1139,13 @@ export class Service {
           ctx.resources = resource;
           acsResponse = await checkAccessRequest(ctx, [{ resource: sourceBucketName, id: key }], AuthZAction.READ,
             Operation.isAllowed);
-        } catch (err) {
+        } catch (err: any) {
           this.logger.error('Error occurred requesting access-control-srv for copy read', err);
           grpcResponse.responses.push({
             status: {
               id: sourceKeyName,
-              code: err.code || 500,
-              message: err.message
+              code: Number.isInteger(err?.code) ? err.code : 500,
+              message: err?.message
             }
           });
           continue;
@@ -1300,12 +1304,12 @@ export class Service {
                 }
               });
             });
-          } catch (err) {
+          } catch (err: any) {
             grpcResponse.responses.push({
               status: {
                 id: key,
-                code: err.code || 500,
-                message: err.message
+                code: Number.isInteger(err?.code) ? err.code : 500,
+                message: err?.message
               }
             });
           }
@@ -1423,14 +1427,14 @@ export class Service {
                 }
               });
             });
-          } catch (err) {
-            this.logger.error('Error copying object', { code: err.code, message: err.message, stack: err.stack });
+          } catch (err: any) {
+            const status: Status = {
+              code: Number.isInteger(err?.code) ? err.code : 500,
+              message: err?.message
+            };
+            this.logger.error('Error copying object', status, err.stack);
             grpcResponse.responses.push({
-              status: {
-                id: key,
-                code: err.code || 500,
-                message: err.message
-              }
+              status
             });
           }
         }
@@ -1481,7 +1485,7 @@ export class Service {
     const headObject: any = await getHeadObject(resources, this.ossClient, this.logger);
     if (headObject?.status) {
       return {
-        status: [{ id: key, code: headObject.status.code, message: headObject.status.message }],
+        status: [{ id: key, code: Number.isInteger(headObject?.status?.code) ? headObject.status.code : 500, message: headObject.status.message }],
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }
@@ -1520,10 +1524,14 @@ export class Service {
       ctx.resources = resources;
       acsResponse = await checkAccessRequest(ctx, [{ resource: bucket, id: key }], AuthZAction.DELETE,
         Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for delete operation:', err);
       return {
-        status: [{ id: key, code: err.code, message: err.message }],
+        status: [{
+          id: key,
+          code: Number.isInteger(err?.code) ? err.code : 500,
+          message: err?.message
+        }],
         operation_status: OPERATION_STATUS_SUCCESS
       };
     }
@@ -1568,7 +1576,7 @@ export class Service {
     try {
       this.cfg.set('authorization:enabled', false);
       updateConfig(this.cfg);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error caught disabling authorization:', { err });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
@@ -1581,7 +1589,7 @@ export class Service {
     try {
       this.cfg.set('authorization:enabled', true);
       updateConfig(this.cfg);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error caught enabling authorization:', { err });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
@@ -1594,7 +1602,7 @@ export class Service {
     try {
       this.cfg.set('authorization:enabled', this.authZCheck);
       updateConfig(this.cfg);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error caught enabling authorization:', { err });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
