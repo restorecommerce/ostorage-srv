@@ -7,6 +7,12 @@
       },
       "dataStream": true,
       "source": "ostorage-srv"
+    },
+    "console": {
+      "handleExceptions": false,
+      "level": "silly",
+      "colorize": true,
+      "prettyPrint": true
     }
   },
   "redis": {

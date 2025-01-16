@@ -23,7 +23,7 @@ import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-serve
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta.js';
 import { DeleteResponse } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
-import { Status } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status.js';
+import { OperationStatus, Status } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status.js';
 
 const { S3 } = pkg;
 const META_OWNER = 'meta.owners';
@@ -249,8 +249,18 @@ export class Service {
     if (customArgs?.value) {
       try {
         customArgsFilter = JSON.parse(customArgs.value.toString());
-      } catch (error) {
-        this.logger.error('Error parsing ACS response in list endpoint', { code: error.code, message: error.message, stack: error.stack });
+      } catch (err: any) {
+        const operation_status: OperationStatus = {
+          code: Number.isInteger(err?.code) ? err.code : 500,
+          message: err?.message,
+        }
+        this.logger.error('Error parsing ACS response in list endpoint', {
+          operation_status,
+          stack: err?.stack
+        });
+        return {
+          operation_status
+        };
       }
       // applicable target owners instances
       ownerValues = customArgsFilter.instance;
@@ -280,7 +290,7 @@ export class Service {
         let objList: any;
         try {
           objList = await new Promise((resolve, reject) => {
-            this.ossClient.listObjectsV2(request, (err, data) => {
+            this.ossClient.listObjectsV2(request, (err: any, data: any) => {
               if (err) {
                 this.logger.error('Error occurred while listing objects',
                   {
@@ -749,11 +759,10 @@ export class Service {
       if (acsResponse.decision != Response_Decision.PERMIT) {
         return {
           response: {
-            payload: null,
             status: {
               id: key,
-              code: acsResponse.operation_status.code,
-              message: acsResponse.operation_status.message
+              code: acsResponse.operation_status?.code ?? 500,
+              message: acsResponse.operation_status?.message
             }
           },
           operation_status: OPERATION_STATUS_SUCCESS
@@ -776,15 +785,15 @@ export class Service {
         subjectID
       );
       return response;
-    } catch (e) {
+    } catch (e: any) {
       this.logger.error('Error occurred while storing object.', e);
       return {
         response: {
           payload: null,
           status: {
             id: key,
-            code: e.code,
-            message: e.message
+            code: Number.isInteger(e?.code) ? e.code : 500,
+            message: e?.message
           }
         },
         operation_status: OPERATION_STATUS_SUCCESS
@@ -861,7 +870,7 @@ export class Service {
           ContentLanguage: options.content_language,
           ContentDisposition: options.content_disposition,
           Tagging: TaggingQueryParams // this param looks like 'key1=val1&key2=val2'
-        }, (err, data) => {
+        }, (err: any, data: any) => {
           if (err) {
             this.logger.error('Error occurred while storing object',
               {
@@ -869,10 +878,9 @@ export class Service {
               });
             return {
               response: {
-                payload: null,
                 status: {
                   id: key,
-                  code: (err as any).code || 500,
+                  code: Number.isInteger(err?.code) ? err.code : 500,
                   message: err?.message
                 }
               },
@@ -1107,8 +1115,18 @@ export class Service {
               meta_subject = JSON.parse(headObject.Metadata.subject);
             }
           }
-        } catch (error) {
-          this.logger.error('Error parsing object meta data in copy endpoint', { code: error.code, message: error.message, stack: error.stack });
+        } catch (err: any) {
+          const status: Status = {
+            code: Number.isInteger(err?.code) ? err.code : 500,
+            message: err.message,
+          };
+          this.logger.error('Error parsing object meta data in copy endpoint', {
+            status,
+            stack: err.stack
+          });
+          grpcResponse.responses.push({
+            status
+          });
         }
         if (!subject) {
           subject = { id: '', unauthenticated: undefined, scope: '', token: '' };
@@ -1186,22 +1204,12 @@ export class Service {
           });
           continue;
         }
-        // need to iterate and check if there is at least one key set
-        // since the gRPC adds default values for missing fields
-        let optionsExist = false;
-        let optionKeys = [];
-        if (options) {
-          optionKeys = Object.keys(options);
-        }
-        for (const optKey of optionKeys) {
-          if (!_.isEmpty(options[optKey])) {
-            optionsExist = true;
-            break;
-          }
-        }
+
+        const optionsExist = Object.values(options ?? {}).some(
+          o => o !== undefined
+        );
 
         // CASE 1: User provides at least one option => replace all obj meta including tagging
-
         if (optionsExist) {
           params.MetadataDirective = 'REPLACE';
           params.TaggingDirective = 'REPLACE';
