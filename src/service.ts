@@ -183,7 +183,7 @@ export class Service {
 
   private filterObjects(requestFilter, object, listResponse) {
     // if filter is provided return data based on filter
-    if (requestFilter && requestFilter?.filters && !_.isEmpty(requestFilter?.filters)) {
+    if (!_.isEmpty(requestFilter?.filters)) {
       const filters = requestFilter.filters[0];
       if (filters && filters?.field == META_OWNER && filters?.operation == EQ && filters?.value) {
         let metaOwnerVal;
@@ -340,7 +340,11 @@ export class Service {
               // if target objects owners instance `ownerInst` is contained in the
               // list of applicable `ownerValues` returned from ACS ie. ownerValues.includes(ownerInst)
               // then its considred a match for further filtering based on filter field if it exists
-              if (objectMeta?.owners?.length > 0) {
+              if (!ownerValues) {
+                this.filterObjects(filters, object, listResponse);
+              }
+              else if (objectMeta?.owners?.length > 0) {
+                // no scoping defined in the Rule
                 for (const idVal of objectMeta.owners) {
                   if (idVal && idVal.id === ownerIndictaorEntURN && idVal.value === ownerIndicatorEntity && idVal.attributes?.length > 0) {
                     for (const ownInstObj of idVal.attributes) {
@@ -349,13 +353,6 @@ export class Service {
                       }
                     }
                   }
-                }
-                // no scoping defined in the Rule
-                if (!ownerValues) {
-                  listResponse.responses.push({
-                    payload: object,
-                    status: { id: objectName, code: 200, message: 'success' }
-                  });
                 }
               }
             } else {
