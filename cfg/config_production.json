@@ -20,7 +20,7 @@
   },
   "s3": {
     "client": {
-      "endpoint": "http://cloudserver:8000"
+      "endpoint": "http://rustfs:9000"
     }
   },
   "events": {
