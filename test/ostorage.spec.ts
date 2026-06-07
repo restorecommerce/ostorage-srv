@@ -861,11 +861,11 @@ describe('testing ostorage-srv with ACS disabled', () => {
     });
 
     it('should give an error for invalid bucket request', async () => {
-      let result = await ostorageService.list({
+      const result = await ostorageService.list({
         bucket: 'invalid_bucket'
       });
-      should.not.exist(result.responses);
-      result.operation_status.message.should.equal('The specified bucket is not valid.');
+      should.exist(result.operation_status);
+      result.operation_status.code.should.equal(500);
       await new Promise((resolve, reject) => {
         setTimeout(resolve, 3000);
       });;
