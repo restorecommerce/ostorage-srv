@@ -16,7 +16,8 @@ import { ListObjectsV2Request } from 'aws-sdk/clients/s3.js';
 import {
   ServerStreamingMethodResult, DeepPartial, Object as PutObject, ObjectResponse, ListRequest,
   ListResponse, GetRequest, Options, PutResponse, MoveRequestList,
-  MoveResponseList, CopyResponseList, CopyRequestList, CopyResponseItem, DeleteRequest
+  MoveResponseList, CopyResponseList, CopyRequestList, CopyResponseItem, DeleteRequest,
+  UpdateACLRequestList, UpdateACLResponseList
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
 import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/attribute.js';
@@ -1018,6 +1019,137 @@ export class Service {
     moveResponse.operation_status = { code: 200, message: 'success' };
     this.logger.info('Move Object response', moveResponse);
     return moveResponse;
+  }
+
+  async UpdateACL(request: UpdateACLRequestList, ctx: any): Promise<DeepPartial<UpdateACLResponseList>> {
+    const updateACLResponse: UpdateACLResponseList = { responses: [], operation_status: { code: 0, message: '' } };
+    let subject = request.subject;
+    this.logger.info('Update ACL request', { items: request.items });
+    for (const item of request.items || []) {
+      if (!item?.bucket || !item?.key) {
+        updateACLResponse.responses.push({
+          status: {
+            id: item?.key ? item.key : item.bucket,
+            code: 400,
+            message: 'Bucket or Key not provided'
+          }
+        });
+        continue;
+      }
+      const headObjectParams = { Bucket: item.bucket, Key: item.key };
+      const headObject: any = await getHeadObject(headObjectParams, this.ossClient, this.logger);
+      if (headObject?.status) {
+        updateACLResponse.responses.push({
+          status: {
+            id: item.key,
+            code: Number.isInteger(headObject?.status?.code) ? headObject.status.code : 500,
+            message: headObject.status.message
+          }
+        });
+        continue;
+      }
+      let metaObj: Meta;
+      let data = {};
+      let meta_subject = { id: '' };
+      try {
+        if (headObject?.Metadata?.meta) {
+          metaObj = JSON.parse(headObject.Metadata.meta);
+          // restore ACL from redis into metaObj
+          let redisKey;
+          if (item?.key?.startsWith('/')) {
+            redisKey = item.key.substring(1);
+          } else {
+            redisKey = item?.key;
+          }
+          const acl = await this.aclRedisClient.get(`${item.bucket}:${redisKey}`);
+          if (acl) {
+            metaObj.acls = JSON.parse(acl);
+          }
+        }
+        if (headObject.Metadata.data) {
+          data = JSON.parse(headObject.Metadata.data);
+        }
+        if (headObject.Metadata.subject) {
+          meta_subject = JSON.parse(headObject.Metadata.subject);
+        }
+      } catch (err: any) {
+        const status: Status = {
+          code: Number.isInteger(err?.code) ? err.code : 500,
+          message: err.message,
+        };
+        this.logger.error('Error parsing object meta data in copy endpoint', {
+          status,
+          stack: err.stack
+        });
+        updateACLResponse.responses.push({
+          status
+        });
+      }
+      if (!subject) {
+        subject = { id: '', unauthenticated: undefined, scope: '', token: '' };
+      }
+      if (metaObj?.owners?.length > 0) {
+        let metaOwnerVal;
+        const ownerInstanceURN = this.cfg.get('authorization:urns:ownerInstance');
+        for (const owner of metaObj.owners) {
+          if (owner?.attributes?.length > 0) {
+            for (const ownerInstObj of owner.attributes) {
+              if (ownerInstObj.id === ownerInstanceURN) {
+                metaOwnerVal = ownerInstObj.value;
+              }
+            }
+          }
+        }
+        // restore scope for acs check from metaObj owners
+        subject.scope = metaOwnerVal;
+      }
+
+      // ACS read request check for source Key READ and CREATE action request check for destination Bucket
+      const resource = { id: item.key, key: item.key, meta: metaObj, data, subject: { id: meta_subject.id } };
+      let acsResponse: DecisionResponse; // isAllowed check for Read operation
+      try {
+        if (!ctx) { ctx = {}; };
+        // target entity for ACS is source bucket here
+        ctx.subject = subject;
+        ctx.resources = resource;
+        acsResponse = await checkAccessRequest(ctx, [{ resource: item.bucket, id: item.key }], AuthZAction.MODIFY,
+          Operation.isAllowed);
+      } catch (err: any) {
+        this.logger.error('Error occurred requesting access-control-srv for modifying ACL', err);
+        updateACLResponse.responses.push({
+          status: {
+            id: item.key,
+            code: Number.isInteger(err?.code) ? err.code : 500,
+            message: err?.message
+          }
+        });
+        continue;
+      }
+      if (acsResponse.decision != Response_Decision.PERMIT) {
+        updateACLResponse.responses.push({
+          status: {
+            id: item.key,
+            code: acsResponse.operation_status.code || 500,
+            message: acsResponse.operation_status.message
+          }
+        });
+        continue;
+      }
+      if (item?.acls?.length) {
+        // store update acl to redis
+        await this.aclRedisClient.set(`${item.bucket}:${item.key}`, JSON.stringify(item.acls));
+      }
+      updateACLResponse.responses.push({
+        status: {
+          id: item.key,
+          code: 200,
+          message: 'success'
+        }
+      });
+    }
+    updateACLResponse.operation_status = { code: 200, message: 'success' };
+    this.logger.info('Update ACL response', updateACLResponse);
+    return updateACLResponse;
   }
 
   async copy(request: CopyRequestList, ctx: any): Promise<DeepPartial<CopyResponseList>> {
