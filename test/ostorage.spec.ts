@@ -13,6 +13,7 @@ import { Transform } from 'stream';
 import * as _ from 'lodash-es';
 import { ObjectServiceClient, ObjectServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
 import { createClient as RedisCreateClient, RedisClientType } from 'redis';
+import { it, describe, beforeAll, afterAll } from 'vitest';
 
 let cfg: any;
 let logger;
@@ -236,13 +237,13 @@ async function getOstorageService(clientCfg: any): Promise<ObjectServiceClient> 
 
 describe('testing ostorage-srv with ACS enabled', () => {
   let mockServer: any;
-  before(async function startServer(): Promise<void> {
+  beforeAll(async function startServer(): Promise<void> {
     // ACS is enabled in config by default
     await start();
     ostorageService = await getOstorageService(cfg.get('client:ostorage'));
   });
 
-  after(async function stopServer(): Promise<void> {
+  afterAll(async function stopServer(): Promise<void> {
     await stop();
   });
   let subject;
@@ -529,14 +530,14 @@ describe('testing ostorage-srv with ACS enabled', () => {
 });
 
 describe('testing ostorage-srv with ACS disabled', () => {
-  before(async function startServer(): Promise<void> {
+  beforeAll(async function startServer(): Promise<void> {
     await start();
     // Disable ACS
     worker.oss.disableAC();
     ostorageService = await getOstorageService(cfg.get('client:ostorage'));
   });
 
-  after(async function stopServer(): Promise<void> {
+  afterAll(async function stopServer(): Promise<void> {
     await stop();
   });
 
