@@ -17,7 +17,8 @@ import {
   ServerStreamingMethodResult, DeepPartial, Object as PutObject, ObjectResponse, ListRequest,
   ListResponse, GetRequest, Options, PutResponse, MoveRequestList,
   MoveResponseList, CopyResponseList, CopyRequestList, CopyResponseItem, DeleteRequest,
-  UpdateACLRequestList, UpdateACLResponseList
+  UpdateACLRequestList, UpdateACLResponseList,
+  ObjectServiceImplementation
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
 import { Response_Decision } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/attribute.js';
@@ -35,7 +36,7 @@ const OPERATION_STATUS_SUCCESS = {
   message: 'success'
 };
 
-export class Service {
+export class Service implements ObjectServiceImplementation {
   ossClient: S3; // object storage frameworks are S3-compatible
   buckets: string[];
   bucketsLifecycleConfigs?: any;
@@ -1021,7 +1022,7 @@ export class Service {
     return moveResponse;
   }
 
-  async UpdateACL(request: UpdateACLRequestList, ctx: any): Promise<DeepPartial<UpdateACLResponseList>> {
+  async updateACL(request: UpdateACLRequestList, ctx: any): Promise<DeepPartial<UpdateACLResponseList>> {
     const updateACLResponse: UpdateACLResponseList = { responses: [], operation_status: { code: 0, message: '' } };
     let subject = request.subject;
     this.logger.info('Update ACL request', { items: request.items });
@@ -1140,6 +1141,11 @@ export class Service {
         await this.aclRedisClient.set(`${item.bucket}:${item.key}`, JSON.stringify(item.acls));
       }
       updateACLResponse.responses.push({
+        payload: {
+          key: item.key,
+          bucket: item.bucket,
+          acls: item.acls
+        },
         status: {
           id: item.key,
           code: 200,

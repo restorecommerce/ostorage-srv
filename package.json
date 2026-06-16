@@ -67,7 +67,7 @@
   },
   "scripts": {
     "start": "node lib/start.cjs",
-    "dev": "cross-env NODE_ENV=development nodemon --watch './src/**/*.ts' --exec node --loader ts-node/esm ./src/start.ts",
+    "dev": "cross-env NODE_ENV=development node --watch lib/start.cjs",
     "tsctests": "tsc -d -p tsconfig.test.json",
     "test": "npm run lint && vitest run",
     "lint": "eslint src",

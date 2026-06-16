@@ -432,8 +432,68 @@ describe('testing ostorage-srv with ACS enabled', () => {
       result.status[0].message.should.equal('Access not allowed for request with subject:invalid_subject_id_3, resource:test, action:DELETE, target_scope:orgD; the response was DENY');
       await new Promise((resolve, reject) => {
         setTimeout(resolve, 3000);
-      });;
+      });
     });
+
+    it('With invalid subject scope should respond with an error when modifying ACL of object', async () => {
+      // make sub id invalid so that data is not read from ACS cache
+      subject.id = 'invalid_subject_id_1';
+      const updatedACLResponse = await ostorageService.updateACL({
+        items: [{
+          key: 'config_acs_enabled.json',
+          bucket: 'test',
+          acls: [{
+            id: "urn:restorecommerce:acs:names:aclIndicatoryEntity",
+            value: "urn:restorecommerce:acs:model:organization.Organization",
+            attributes: [
+              {
+                id: "urn:restorecommerce:acs:names:aclInstance",
+                value: "a"
+              }
+            ],
+          }]
+        }],
+        subject
+      });
+      should.exist(updatedACLResponse.operation_status);
+      updatedACLResponse.responses[0].status?.id.should.equal('config_acs_enabled.json');
+      updatedACLResponse.responses[0].status?.code.should.equal(403);
+      updatedACLResponse.responses[0].status?.message.should.equal('Access not allowed for request with subject:invalid_subject_id_1, resource:test, action:MODIFY, target_scope:orgC; the response was DENY');
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });
+    });
+
+    it('With valid subject scope should respond update ACL of object', async () => {
+      subject.id = 'admin_user_id';
+      subject.scope = 'orgC'; // setting valid subject scope
+      const updatedACLResponse = await ostorageService.updateACL({
+        items: [{
+          key: 'config_acs_enabled.json',
+          bucket: 'test',
+          acls: [{
+            id: "urn:restorecommerce:acs:names:aclIndicatoryEntity",
+            value: "urn:restorecommerce:acs:model:organization.Organization",
+            attributes: [
+              {
+                id: "urn:restorecommerce:acs:names:aclInstance",
+                value: "orgC"
+              }
+            ],
+          }]
+        }],
+        subject
+      });
+      should.exist(updatedACLResponse.operation_status);
+      updatedACLResponse.responses[0].payload?.key.should.equal('config_acs_enabled.json');
+      updatedACLResponse.responses[0].status?.code.should.equal(200);
+      updatedACLResponse.responses[0].status?.message.should.equal('success');
+      updatedACLResponse.responses[0].payload?.acls[0].attributes[0].value.should.equal('orgC');
+      await new Promise((resolve, reject) => {
+        setTimeout(resolve, 3000);
+      });
+    });
+
     it('With invalid scope should result in an error when replacing the object', async () => {
       // make sub id invalid so that data is not read from ACS cache
       subject.id = 'invalid_subject_id_4';
@@ -842,8 +902,8 @@ describe('testing ostorage-srv with ACS disabled', () => {
           }
         }
         await new Promise((resolve, reject) => {
-        setTimeout(resolve, 3000);
-      });;
+          setTimeout(resolve, 3000);
+        });;
       });
 
     it('should list the Object', async () => {
